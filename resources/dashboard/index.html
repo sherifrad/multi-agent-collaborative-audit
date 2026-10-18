@@ -67,6 +67,45 @@
       cursor: pointer;
     }
 
+    .btn-pick {
+      background: linear-gradient(135deg, #0284c7, #0ea5e9);
+      color: #fff;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-pick:hover {
+      background: linear-gradient(135deg, #0369a1, #0284c7);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+    }
+    .btn-pick:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-inspect {
+      background: #1e293b;
+      color: var(--accent);
+      border: 1px solid var(--card-border);
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-inspect:hover {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent);
+    }
+
     /* Scorecards Grid */
     .kpi-grid {
       display: grid;
@@ -183,6 +222,9 @@
         <select id="projectSelector" onchange="switchProject(this.value)">
           <!-- Populated by JS -->
         </select>
+        <button id="btnPickFolder" class="btn-pick" onclick="openFolderPicker()" title="Choose any project directory on your device without writing code">
+          <span>📂</span> <span>Choose Folder...</span>
+        </button>
       </div>
     </header>
 
@@ -263,6 +305,7 @@
               <th>Governance (.agents)</th>
               <th>Git History Cleanliness</th>
               <th>MACA Health Status</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody id="relatedTableBody">
@@ -376,6 +419,7 @@
               <td>${p.has_agents ? '✅ Configured' : '⚠️ Missing'}</td>
               <td>${p.is_clean ? '✅ Clean' : '⚠️ Uncommitted'}</td>
               <td><span class="grade-badge grade-A">${p.status}</span></td>
+              <td><button class="btn-inspect" onclick="inspectProject('${p.path}')">Inspect Target</button></td>
             </tr>
           `;
         });
@@ -386,17 +430,67 @@
       selector.innerHTML = `<option value="current">${data.project.name} (Current)</option>`;
       if (data.related_projects) {
         data.related_projects.forEach(p => {
-          selector.innerHTML += `<option value="${p.path}">${p.name}</option>`;
+          const isSelected = (data.project.path === p.path) ? 'selected' : '';
+          selector.innerHTML += `<option value="${p.path}" ${isSelected}>${p.name}</option>`;
         });
       }
     }
 
-    function switchProject(val) {
+    async function openFolderPicker() {
+      const btn = document.getElementById('btnPickFolder');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<span>⏳</span> <span>Opening Picker...</span>';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/pick-folder');
+        const result = await res.json();
+        if (result.status === 'success' && result.data) {
+          TELEMETRY_DATA = result.data;
+          renderDashboard(result.data);
+          const sel = document.getElementById('projectSelector');
+          let exists = false;
+          for (let opt of sel.options) {
+            if (opt.value === result.data.project.path) { exists = true; break; }
+          }
+          if (!exists) {
+            const newOpt = document.createElement('option');
+            newOpt.value = result.data.project.path;
+            newOpt.textContent = `${result.data.project.name} (Custom)`;
+            sel.appendChild(newOpt);
+          }
+          sel.value = result.data.project.path;
+        }
+      } catch (err) {
+        console.error("Folder picker error:", err);
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }
+    }
+
+    async function inspectProject(path) {
+      try {
+        const res = await fetch('/api/telemetry?project=' + encodeURIComponent(path));
+        const data = await res.json();
+        TELEMETRY_DATA = data;
+        renderDashboard(data);
+        const sel = document.getElementById('projectSelector');
+        sel.value = path;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (err) {
+        console.error("Inspect project error:", err);
+      }
+    }
+
+    async function switchProject(val) {
       if (val === 'current') {
-        renderDashboard(TELEMETRY_DATA);
+        const res = await fetch('/api/telemetry');
+        const data = await res.json();
+        TELEMETRY_DATA = data;
+        renderDashboard(data);
       } else {
-        // Fetch or simulate switched project view
-        console.log("Switching target project to:", val);
+        await inspectProject(val);
       }
     }
 

@@ -205,24 +205,87 @@ def collect_telemetry(repo_dir: Path) -> dict:
     }
 
 
+def pick_folder_dialog() -> str | None:
+    """Opens native OS folder picker without writing any code or CLI parameters."""
+    if sys.platform == "darwin":
+        try:
+            cmd = [
+                "osascript", "-e",
+                'POSIX path of (choose folder with prompt "Select Project Directory for MACA Audit")'
+            ]
+            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode == 0:
+                return result.stdout.strip().rstrip("/")
+        except Exception:
+            pass
+    elif sys.platform.startswith("linux"):
+        try:
+            cmd = ["zenity", "--file-selection", "--directory", "--title=Select Project Directory"]
+            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode == 0:
+                return result.stdout.strip().rstrip("/")
+        except Exception:
+            pass
+    return None
+
+
 class TelemetryServer(BaseHTTPRequestHandler):
     """Lightweight embedded HTTP server for the Single-Page Dashboard."""
     telemetry_cache = {}
+    projects_cache = {}
 
     def do_GET(self):
-        if self.path == "/api/telemetry":
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(self.path)
+
+        if parsed.path == "/api/pick-folder":
+            chosen = pick_folder_dialog()
+            if chosen and Path(chosen).exists():
+                chosen_path = Path(chosen)
+                data = collect_telemetry(chosen_path)
+                self.projects_cache[sanitize_path(str(chosen_path))] = data
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "success", "data": data}).encode("utf-8"))
+            else:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "canceled"}).encode("utf-8"))
+            return
+
+        elif parsed.path == "/api/telemetry":
+            qs = parse_qs(parsed.query)
+            target_proj = qs.get("project", [None])[0]
+
+            if target_proj:
+                # Resolve ~ if sanitized
+                raw_path = target_proj
+                if raw_path.startswith("~"):
+                    raw_path = str(Path.home()) + raw_path[1:]
+                p = Path(raw_path)
+                if p.exists() and p.is_dir():
+                    data = collect_telemetry(p)
+                else:
+                    data = self.telemetry_cache
+            else:
+                data = self.telemetry_cache
+
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
-            self.wfile.write(json.dumps(self.telemetry_cache).encode("utf-8"))
-        elif self.path == "/" or self.path.startswith("/index.html"):
+            self.wfile.write(json.dumps(data).encode("utf-8"))
+            return
+
+        elif parsed.path == "/" or parsed.path.startswith("/index.html"):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             if DASHBOARD_HTML_PATH.exists():
                 html_content = DASHBOARD_HTML_PATH.read_text(encoding="utf-8")
-                # Inject pre-rendered data for instantaneous render
                 injected = html_content.replace(
                     "let TELEMETRY_DATA = window.__TELEMETRY_DATA__ || null;",
                     f"let TELEMETRY_DATA = {json.dumps(self.telemetry_cache)};"
@@ -230,12 +293,12 @@ class TelemetryServer(BaseHTTPRequestHandler):
                 self.wfile.write(injected.encode("utf-8"))
             else:
                 self.wfile.write(b"<h1>Dashboard HTML template not found.</h1>")
+            return
         else:
             self.send_response(404)
             self.end_headers()
 
     def log_message(self, format, *args):
-        # Silence standard HTTP access logging to keep terminal clean
         return
 
 
