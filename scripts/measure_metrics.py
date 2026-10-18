@@ -261,11 +261,23 @@ class TelemetryServer(BaseHTTPRequestHandler):
             target_proj = qs.get("project", [None])[0]
 
             if target_proj:
-                # Resolve ~ if sanitized
                 raw_path = target_proj
                 if raw_path.startswith("~"):
                     raw_path = str(Path.home()) + raw_path[1:]
                 p = Path(raw_path)
+                if not (p.exists() and p.is_dir()):
+                    # Search common locations if only directory name is given
+                    candidates = [
+                        Path.home() / target_proj,
+                        REPO_ROOT.parent / target_proj,
+                        REPO_ROOT.parent.parent / target_proj,
+                        REPO_ROOT / target_proj
+                    ]
+                    for c in candidates:
+                        if c.exists() and c.is_dir():
+                            p = c
+                            break
+
                 if p.exists() and p.is_dir():
                     data = collect_telemetry(p)
                 else:
