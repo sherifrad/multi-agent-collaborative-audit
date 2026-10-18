@@ -112,9 +112,14 @@ To prevent endless review loops:
     *   **Deferred Shortcut**: Optimization, cosmetic styling, or non-critical refactoring. *Tagged as `// ponytail: <path>` and logged in `.agents/AI_HANDOFF_LEDGER.md` under Ponytail Debt.*
 *   **Antigravity Supreme Arbiter Clause**: If lanes disagree after Round 2 (e.g., cross-lane blame), the orchestrator immediately steps in, issues a definitive verdict, and writes the resolving patch directly.
 
+### 3. Fast-Path Hotfix Protocol (Trivial Task Bypass)
+To avoid unnecessary latency and token expenditure on trivial changes:
+*   **Eligibility**: 1-file typo fixes, documentation grammar, single CSS color tweaks, or dependency patch bumps.
+*   **Fast-Path Action**: The orchestrator directly implements the patch, skips full multi-lane SDD breakdown, verifies static analysis, and commits with standard audit trailers without generating extensive multi-page specs.
+
 ---
 
-## Phase 4 & 5: Platform Stress Testing & Final Commit
+## Phase 4 & 5: Platform Stress Testing, Telemetry & Final Commit
 
 ### 1. Cross-Platform Stress Verification
 1.  Run build and static analyzers:
@@ -133,11 +138,18 @@ To prevent endless review loops:
     X-Audited-By: Antigravity-Orchestrator"
     ```
 
-### 3. Final Verification Checklist
+### 3. Telemetry & Performance Measurement
+Run the telemetry engine to measure execution health and launch the evidence dashboard:
+*   **Execution**: `./scripts/measure_metrics.py` (launches single-page web cockpit on `127.0.0.1:8420`).
+*   **CLI / CI Mode**: `./scripts/measure_metrics.py --json` or `./scripts/measure_metrics.py --export-html report.html`.
+*   **Scorecard Targets**: Simplicity Index $\ge 70\%$, Arbiter Escalations $\le 10\%$, First-Turn Pass $\ge 70\%$.
+
+### 4. Final Verification Checklist
 Before concluding, the orchestrator verifies:
 - [ ] `./scripts/bootstrap.sh` or fallback was executed.
 - [ ] `.agents/SPEC_AND_AUDIT.md` reflects true zero-presumption findings.
-- [ ] `.agents/PLAN_TASKS.md` tasks were completed by their designated lanes.
+- [ ] `.agents/PLAN_TASKS.md` tasks were completed by their designated lanes (or Fast-Path applied).
 - [ ] Ponytail Ladder was honored; no bloat or obfuscated code introduced.
 - [ ] Hard blockers resolved; deferred shortcuts documented in `AI_HANDOFF_LEDGER.md`.
+- [ ] Telemetry measured via `./scripts/measure_metrics.py`.
 - [ ] All tests and linters pass cleanly.

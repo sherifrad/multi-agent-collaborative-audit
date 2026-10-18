@@ -178,16 +178,66 @@ skills/multi-agent-collaborative-audit/
 ├── SKILL.md                          # Comprehensive agent runbook & instructions
 ├── README.md                         # Public documentation and visual architecture
 ├── scripts/
-│   └── bootstrap.sh                  # Non-blocking fleet discovery & engine probe
+│   ├── bootstrap.sh                  # Non-blocking fleet discovery & engine probe
+│   └── measure_metrics.py            # Local telemetry parser & single-page web server
 ├── references/
 │   ├── ponytail_ladder.md            # In-depth guide for the 7-Rung Ponytail Ladder
 │   └── domain_packs.md               # Specifications for Clinical, FinTech, Systems packs
 └── resources/
+    ├── dashboard/
+    │   └── index.html                # Single-Page Application (SPA) Cockpit UI
     └── templates/
         ├── AGENTS.template.md         # Multi-agent role matrix template
         ├── AI_HANDOFF_LEDGER.template.md # Handoff log, critique tracker, and debt ledger
         └── SPEC_AND_AUDIT.template.md    # Zero-presumption audit & specification contract
 ```
+
+---
+
+## 📊 Telemetry, Metrics & The Single-Page Cockpit
+
+MACA features an integrated **Evaluation & Telemetry Cockpit** that measures how effectively the skill is used across repositories and displays real-time evidence in a modern dark-mode Single-Page Application (SPA).
+
+```
+[ Git Logs / Commit Trailers ] ──┐
+                                 ▼
+[ AI_HANDOFF_LEDGER.md ] ───────► [ scripts/measure_metrics.py ] ──► 🌐 http://127.0.0.1:8420
+                                 ▲                                     (Interactive Web Dashboard)
+[ Related Projects Scanner ] ───┘
+```
+
+### 1. Launching the Web Cockpit
+Run the telemetry script in any repository:
+```bash
+# Launch interactive web dashboard in default browser (port 8420)
+./scripts/measure_metrics.py
+
+# Or export standalone HTML without starting a server
+./scripts/measure_metrics.py --export-html telemetry_report.html
+
+# Or output structured JSON for CI/CD pipelines
+./scripts/measure_metrics.py --json
+```
+
+### 2. What the Dashboard Measures
+* **Overall Efficacy Score (0–100 & Letter Grade)**: Synthesized from Ponytail compliance, review turnaround speed, and zero regression.
+* **Ponytail Simplicity Index**: Percentage of architectural solutions resolved in Rungs 1–3 (YAGNI, Repo Helpers, Standard Library) vs. Rungs 6–7 (Custom/Complex).
+* **First-Turn Review Pass Rate**: Percentage of code patches approved in Round 1 without requiring rework.
+* **Arbiter Escalation Count**: Number of cross-lane disputes escalated to the Antigravity Supreme Arbiter.
+* **Evidence & Audit Trail**: Real-time table displaying commit SHAs, author lanes, verified scopes, and Ponytail debt tickets (`// ponytail:`).
+* **Related Workspace Projects**: Scans neighboring repositories and reports their branch status, governance adoption, and git cleanliness.
+
+---
+
+## ⚖️ Architectural Trade-Offs (Pros & Cons)
+
+| Dimension | Strengths (Pros) | Trade-Offs (Cons) & Mitigations |
+| :--- | :--- | :--- |
+| **Code Simplicity** | Eliminates AI bloat; enforces standard library and existing helpers first. | Over-minimalism risk. *Mitigated by strict safety/validation guardrails.* |
+| **Review Velocity** | Capped at 2 rounds; Antigravity Arbiter breaks deadlocks instantly. | Requires capable orchestrator model to make sound tie-breaking rulings. |
+| **Scarcity Resilience** | Cascades smoothly across 3 tiers (CLIs $\rightarrow$ Subagents $\rightarrow$ Personas). | External CLIs (Tier 1) require local PATH installation. |
+| **Task Overhead** | Ensures zero-presumption rigor on complex or clinical code. | Heavy for 1-line typo fixes. *Mitigated by Fast-Path Hotfix Bypass.* |
+| **Non-Destruction** | Zero header comments injected into code; no lint/CI breakage. | Relies on `.agents/` directory governance and Git commit metadata. |
 
 ---
 
