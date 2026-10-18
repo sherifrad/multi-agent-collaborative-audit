@@ -322,8 +322,8 @@
         <select id="projectSelector" onchange="switchProject(this.value)">
           <!-- Populated by JS -->
         </select>
-        <button id="btnPickFolder" class="btn-pick" onclick="openFolderPicker()" title="Choose any project directory on your device without writing code">
-          <span>📂</span> <span>Choose Folder...</span>
+        <button id="btnPickFolder" class="btn-pick" onclick="openFolderPicker()" title="Browse and select project directory">
+          <span>📂</span> <span>Browse Folders...</span>
         </button>
       </div>
     </header>
@@ -415,38 +415,49 @@
       </div>
     </div>
 
-    <!-- Project Selection Modal -->
+    <!-- Project Selection & Directory Navigator Modal -->
     <div id="projectModal" class="modal-overlay">
-      <div class="modal-box">
+      <div class="modal-box" style="max-width: 680px;">
         <div class="modal-header">
-          <h2 style="font-size:18px; font-weight:700;">📂 Choose Project Target</h2>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:22px;">📂</span>
+            <h2 style="font-size:18px; font-weight:700;">Project Directory Navigator</h2>
+          </div>
           <button class="modal-close" onclick="closeProjectModal()">&times;</button>
         </div>
 
-        <div class="native-picker-box" onclick="triggerBrowserPicker()">
-          <div style="font-size:32px; margin-bottom:8px;">📁</div>
-          <div style="font-size:15px; font-weight:700; color:#fff;">Pick Local Directory from Device</div>
-          <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
-            Click to open Finder and choose any project folder directly
-          </div>
+        <!-- Quick Jump Shortcuts -->
+        <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+          <button class="btn-inspect" onclick="loadFolderExplorer('~')">🏠 Home</button>
+          <button class="btn-inspect" onclick="loadFolderExplorer('~/skills')">📂 Skills Workspace</button>
+          <button class="btn-inspect" onclick="loadFolderExplorer('~/agent-skills')">🤖 Agent Skills</button>
+          <button class="btn-inspect" onclick="loadFolderExplorer('~/ponytail')">🪢 Ponytail</button>
         </div>
 
-        <div style="font-size:13px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-top:16px;">
-          Or Quick Pick from Detected Projects:
-        </div>
-        <div id="modalProjectGrid" class="project-grid">
+        <!-- Breadcrumb Navigation Bar -->
+        <div id="explorerBreadcrumb" style="background:#1e293b; padding:8px 12px; border-radius:8px; font-size:13px; font-family:monospace; color:var(--accent); display:flex; align-items:center; gap:6px; overflow-x:auto; margin-bottom:12px; border:1px solid var(--card-border);">
           <!-- Populated by JS -->
         </div>
 
-        <div class="path-input-group">
-          <input type="text" id="manualPathInput" placeholder="Enter folder name or path (e.g. ~/ponytail)..." onkeydown="if(event.key==='Enter') loadManualPath()" />
-          <button onclick="loadManualPath()">Load Target</button>
+        <!-- Subdirectory Explorer View -->
+        <div id="explorerList" style="background:#090d16; border:1px solid var(--card-border); border-radius:8px; max-height:260px; overflow-y:auto; padding:8px; display:flex; flex-direction:column; gap:6px;">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Selection Footer -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; padding-top:12px; border-top:1px solid #1e293b;">
+          <div style="font-size:13px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:380px;">
+            Target: <strong id="selectedFolderPathText" style="color:#fff;">--</strong>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn-inspect" onclick="closeProjectModal()">Cancel</button>
+            <button id="btnConfirmFolder" class="btn-pick" onclick="confirmSelectedFolder()">
+              <span>✔️</span> <span>Select This Project</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
-
-    <!-- Hidden Native Browser Folder Input -->
-    <input type="file" id="browserFolderInput" webkitdirectory directory style="display:none;" onchange="handleBrowserFolder(event)" />
 
     <footer>
       Driven by <strong>Antigravity Fleet Orchestration</strong> • Powered by the <strong>Ponytail Engine</strong> &amp; <strong>Delegate-Skills Protocol</strong>
@@ -456,6 +467,7 @@
   <script>
     // Embedded Data injected by Python server or loaded dynamically
     let TELEMETRY_DATA = window.__TELEMETRY_DATA__ || null;
+    let currentExplorerPath = '~';
 
     function renderDashboard(data) {
       if (!data) return;
@@ -567,23 +579,6 @@
           selector.innerHTML += `<option value="${p.path}" ${isSelected}>${p.name}</option>`;
         });
       }
-
-      // Populate Modal Project Grid
-      const modalGrid = document.getElementById('modalProjectGrid');
-      if (modalGrid && data.related_projects) {
-        modalGrid.innerHTML = '';
-        data.related_projects.forEach(p => {
-          modalGrid.innerHTML += `
-            <div class="project-card" onclick="inspectProject('${p.path}'); closeProjectModal();">
-              <div>
-                <strong style="color:#fff; font-size:13px;">${p.name}</strong>
-                <div style="font-size:11px; color:var(--text-muted);">${p.branch}</div>
-              </div>
-              <span class="badge-pill ${p.has_agents ? 'pill-qa' : 'pill-ui'}">${p.has_agents ? 'MACA' : 'Git'}</span>
-            </div>
-          `;
-        });
-      }
     }
 
     function openProjectModal() {
@@ -594,74 +589,72 @@
       document.getElementById('projectModal').classList.remove('active');
     }
 
-    function triggerBrowserPicker() {
-      document.getElementById('browserFolderInput').click();
-    }
+    async function loadFolderExplorer(dirPath) {
+      const breadcrumbDiv = document.getElementById('explorerBreadcrumb');
+      const listDiv = document.getElementById('explorerList');
+      const targetText = document.getElementById('selectedFolderPathText');
 
-    async function handleBrowserFolder(event) {
-      const files = event.target.files;
-      if (!files || files.length === 0) return;
+      listDiv.innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-muted);">Loading folders...</div>';
 
-      const folderName = files[0].webkitRelativePath.split('/')[0];
-      closeProjectModal();
-
-      // Try server first
       try {
-        const res = await fetch('/api/telemetry?project=' + encodeURIComponent(folderName));
-        if (res.ok) {
-          const data = await res.json();
-          TELEMETRY_DATA = data;
-          renderDashboard(data);
-          return;
+        const res = await fetch('/api/browse?dir=' + encodeURIComponent(dirPath));
+        const data = await res.json();
+        currentExplorerPath = data.current_path;
+        targetText.textContent = data.current_path;
+
+        // Render breadcrumbs
+        const parts = data.current_path.split('/').filter(Boolean);
+        let bcHtml = `<span style="cursor:pointer;" onclick="loadFolderExplorer('~')">🏠</span>`;
+        let accum = parts[0] === '~' ? '~' : '';
+        for (let i = 0; i < parts.length; i++) {
+          if (parts[i] === '~') continue;
+          accum += '/' + parts[i];
+          const p = accum;
+          bcHtml += ` <span>/</span> <span style="cursor:pointer; text-decoration:underline;" onclick="loadFolderExplorer('${p}')">${parts[i]}</span>`;
         }
-      } catch (e) {
-        // Fallback to client-side parsing if server unreachable
-      }
+        breadcrumbDiv.innerHTML = bcHtml;
 
-      // Client-side quick synthesis
-      const syntheticData = {
-        project: {
-          name: folderName,
-          path: '~/' + folderName,
-          domain_pack: 'Auto-Detected Workspace',
-          orchestrator: 'Antigravity (Client Mode)'
-        },
-        metrics: {
-          score: 92,
-          grade: 'A',
-          simplicity_index: 80,
-          first_turn_pass_rate: 85,
-          arbiter_escalations: 0,
-          ponytail_distribution: { rung_1: 30, rung_2: 25, rung_3: 25, rung_4: 10, rung_5: 5, rung_6: 5, rung_7: 0 },
-          lane_participation: { 'UI Lane': 25, 'Core Logic Lane': 25, 'Data Lane': 25, 'QA & Audit Lane': 25 }
-        },
-        evidence: [
-          {
-            id: 'client-pick',
-            lane: 'Core Logic Lane',
-            scope: `Loaded ${files.length} files from ${folderName}`,
-            status: 'Verified',
-            ponytail_rung: 'Rung 3 (Stdlib)',
-            notes: 'Picked via Browser Native Directory Chooser'
-          }
-        ],
-        related_projects: TELEMETRY_DATA ? TELEMETRY_DATA.related_projects : []
-      };
+        // Render folders list
+        listDiv.innerHTML = '';
 
-      TELEMETRY_DATA = syntheticData;
-      renderDashboard(syntheticData);
-    }
+        if (data.parent_path) {
+          listDiv.innerHTML += `
+            <div class="project-card" onclick="loadFolderExplorer('${data.parent_path}')" style="background:#131d2e;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span>📁</span> <strong style="color:var(--accent);">.. (Go Up)</strong>
+              </div>
+            </div>
+          `;
+        }
 
-    function loadManualPath() {
-      const val = document.getElementById('manualPathInput').value.trim();
-      if (val) {
-        inspectProject(val);
-        closeProjectModal();
+        if (!data.subdirectories || data.subdirectories.length === 0) {
+          listDiv.innerHTML += `<div style="padding:16px; text-align:center; color:var(--text-muted);">No further subdirectories found here.</div>`;
+        } else {
+          data.subdirectories.forEach(item => {
+            const badge = item.is_maca ? '<span class="badge-pill pill-qa">MACA</span>' : (item.is_git ? '<span class="badge-pill pill-ui">Git</span>' : '');
+            listDiv.innerHTML += `
+              <div class="project-card" onclick="loadFolderExplorer('${item.path}')">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span>📁</span> <strong style="color:#fff;">${item.name}</strong>
+                </div>
+                <div>${badge}</div>
+              </div>
+            `;
+          });
+        }
+      } catch (err) {
+        listDiv.innerHTML = `<div style="padding:12px; color:var(--danger);">Error loading directory: ${err.message}</div>`;
       }
     }
 
-    async function openFolderPicker() {
+    function openFolderPicker() {
       openProjectModal();
+      loadFolderExplorer(TELEMETRY_DATA ? TELEMETRY_DATA.project.path : '~');
+    }
+
+    function confirmSelectedFolder() {
+      inspectProject(currentExplorerPath);
+      closeProjectModal();
     }
 
     async function inspectProject(path) {
@@ -671,6 +664,16 @@
         TELEMETRY_DATA = data;
         renderDashboard(data);
         const sel = document.getElementById('projectSelector');
+        let exists = false;
+        for (let opt of sel.options) {
+          if (opt.value === path) { exists = true; break; }
+        }
+        if (!exists) {
+          const newOpt = document.createElement('option');
+          newOpt.value = path;
+          newOpt.textContent = `${data.project.name} (${path})`;
+          sel.appendChild(newOpt);
+        }
         sel.value = path;
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (err) {

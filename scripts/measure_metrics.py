@@ -205,28 +205,60 @@ def collect_telemetry(repo_dir: Path) -> dict:
     }
 
 
-def pick_folder_dialog() -> str | None:
-    """Opens native OS folder picker without writing any code or CLI parameters."""
-    if sys.platform == "darwin":
-        try:
-            cmd = [
-                "osascript", "-e",
-                'POSIX path of (choose folder with prompt "Select Project Directory for MACA Audit")'
-            ]
-            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            if result.returncode == 0:
-                return result.stdout.strip().rstrip("/")
-        except Exception:
-            pass
-    elif sys.platform.startswith("linux"):
-        try:
-            cmd = ["zenity", "--file-selection", "--directory", "--title=Select Project Directory"]
-            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            if result.returncode == 0:
-                return result.stdout.strip().rstrip("/")
-        except Exception:
-            pass
-    return None
+def browse_filesystem(path_str: str = "") -> dict:
+    """Lists subdirectories on disk safely without any browser upload prompts."""
+    home = Path.home()
+    if not path_str or path_str == "~":
+        current = home
+    elif path_str.startswith("~"):
+        current = home / path_str[2:] if len(path_str) > 2 else home
+    else:
+        current = Path(path_str)
+
+    try:
+        current = current.resolve()
+        if not current.exists() or not current.is_dir():
+            current = home
+    except Exception:
+        current = home
+
+    parent_path = str(current.parent) if current != home and current != Path("/") else ""
+
+    subdirs = []
+    ignored_names = {
+        "Library", "Movies", "Music", "Pictures", ".Trash", "VirtualBox VMs",
+        ".cache", ".local", "node_modules", ".git"
+    }
+
+    try:
+        with os.scandir(current) as it:
+            entries = sorted(list(it), key=lambda e: e.name.lower())
+            for entry in entries:
+                if entry.name.startswith(".") or entry.name in ignored_names:
+                    continue
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        p = Path(entry.path)
+                        is_git = (p / ".git").exists()
+                        is_maca = (p / ".agents").exists() or (p / "SKILL.md").exists()
+                        subdirs.append({
+                            "name": entry.name,
+                            "path": sanitize_path(entry.path),
+                            "is_git": is_git,
+                            "is_maca": is_maca
+                        })
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    return {
+        "current_path": sanitize_path(str(current)),
+        "parent_path": sanitize_path(parent_path) if parent_path else None,
+        "is_git": (current / ".git").exists(),
+        "is_maca": (current / ".agents").exists() or (current / "SKILL.md").exists(),
+        "subdirectories": subdirs[:50]
+    }
 
 
 class TelemetryServer(BaseHTTPRequestHandler):
@@ -238,22 +270,15 @@ class TelemetryServer(BaseHTTPRequestHandler):
         from urllib.parse import urlparse, parse_qs
         parsed = urlparse(self.path)
 
-        if parsed.path == "/api/pick-folder":
-            chosen = pick_folder_dialog()
-            if chosen and Path(chosen).exists():
-                chosen_path = Path(chosen)
-                data = collect_telemetry(chosen_path)
-                self.projects_cache[sanitize_path(str(chosen_path))] = data
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "success", "data": data}).encode("utf-8"))
-            else:
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "canceled"}).encode("utf-8"))
+        if parsed.path == "/api/browse":
+            qs = parse_qs(parsed.query)
+            target_dir = qs.get("dir", ["~"])[0]
+            data = browse_filesystem(target_dir)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode("utf-8"))
             return
 
         elif parsed.path == "/api/telemetry":
