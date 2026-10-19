@@ -23,6 +23,12 @@
 * **Error Handling & Failure Modes**: `[How every edge case is handled and reported]`
 * **Accessibility & UX Requirements**: `[Focus management, contrast, keyboard traps, tap targets]`
 
+### 3.1 Visual Mockup & UX Contract (Phase 1.5 Approval Gate)
+* **Design Lead**: `[Claude 3.5 Sonnet (Default) | Gemini / Antigravity Generative UI | Local/Other]`
+* **Mock Artifact Path**: `[docs/mocks/<feature>-mock.html or svg]`
+* **User Approval Status**: `[PENDING | APPROVED | REJECTED]`
+* **User Feedback / Adjustments**: `[User comments or signed-off state before task breakdown]`
+
 ---
 
 ## 4. Verification & Testing Matrix

@@ -37,7 +37,7 @@ def sanitize_path(path_str: str) -> str:
 def get_git_evidence(repo_dir: Path) -> tuple[list, dict]:
     """Extracts git commit evidence and lane participation trailers."""
     evidence = []
-    lane_counts = {"UI Lane": 0, "Core Logic Lane": 0, "Data Lane": 0, "QA & Audit Lane": 0}
+    lane_counts = {"UI/UX Design Lane": 0, "Core Logic Lane": 0, "Data Lane": 0, "QA & Audit Lane": 0}
 
     try:
         cmd = ["git", "-C", str(repo_dir), "log", "-n", "30", "--pretty=format:%h|||%an|||%s|||%(trailers:key=X-AI-Lane,valueonly=true)|||%(trailers:key=X-Audited-By,valueonly=true)"]
@@ -54,8 +54,8 @@ def get_git_evidence(repo_dir: Path) -> tuple[list, dict]:
             auditor = parts[4].strip() if len(parts) > 4 else "Antigravity"
 
             assigned_lane = "Core Logic Lane"
-            if "ui" in lane_trailer.lower() or "ui" in subject.lower():
-                assigned_lane = "UI Lane"
+            if any(k in lane_trailer.lower() or k in subject.lower() for k in ["ui", "design", "mock", "ux"]):
+                assigned_lane = "UI/UX Design Lane"
             elif "data" in lane_trailer.lower() or "schema" in subject.lower():
                 assigned_lane = "Data Lane"
             elif "qa" in lane_trailer.lower() or "audit" in subject.lower():

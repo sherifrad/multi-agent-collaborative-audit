@@ -2,8 +2,8 @@
 name: multi-agent-collaborative-audit
 description: >-
   Spec-driven, Ponytail-optimized, multi-agent engineering and audit skill.
-  Coordinates fleet lane partitioning (UI, Logic, Data, QA/Audit), 3-tier
-  scarcity fallback (CLIs, subagents, synthetic personas), dynamic domain packs
+  Coordinates fleet lane partitioning (Claude UI/UX Mocking, Logic, Data, QA/Audit),
+  User Approval Gate for designs, 3-tier scarcity fallback, dynamic domain packs
   (clinical, fintech, fullstack), anti-deadlock arbitration, and non-destructive
   audit trails.
 ---
@@ -63,11 +63,19 @@ Synthesize the audit into `.agents/SPEC_AND_AUDIT.md` using [SPEC_AND_AUDIT.temp
 2.  **Target Interface Contracts**: Define exact DTOs, function signatures, and state flows.
 3.  **Verification Criteria**: Formulate testable pass/fail metrics.
 
+### 3. Phase 1.5: UI/UX & Graphic Mocking (User Approval Gate)
+Whenever a task introduces or alters user interfaces (Mobile views, Web pages, Dashboards, Vector icons):
+1.  **Default Model Routing**: Assigned by default to **Claude Agent / Claude 3.5 Sonnet** for superior spatial reasoning, modern aesthetics, and CSS/Compose ergonomics. If Claude is unavailable, cascades to **Gemini / Antigravity** (`generative_ui` / SVG), then to the best available local model. (See [ui_ux_mocking.md](./references/ui_ux_mocking.md)).
+2.  **Mock Artifact Generation**: The UI/UX Lane creates a standalone interactive visual mockup (saved to `.agents/mocks/<feature_slug>.html` or `.svg`).
+3.  **User Presentation & Review**: The orchestrator presents the rendered preview and file path to the user for evaluation.
+4.  **Mandatory Approval Gate**: The fleet **must not** proceed to Phase 2 task breakdowns or logic implementation until the user explicitly reviews and approves the mock.
+5.  **Visual Contract Binding**: The approved mock path is locked into `.agents/SPEC_AND_AUDIT.md` as the definitive visual specification.
+
 ---
 
 ## Phase 2: Fleet Lane Partitioning & Work Breakdown
 
-The orchestrator partitions work into atomic, decoupled tasks documented in `.agents/PLAN_TASKS.md`:
+The orchestrator partitions work into atomic, decoupled tasks documented in `.agents/PLAN_TASKS.md`, referencing the approved UI/UX mock:
 
 ```
                  ┌────────────────────────────────┐
@@ -75,17 +83,18 @@ The orchestrator partitions work into atomic, decoupled tasks documented in `.ag
                  └───────────────┬────────────────┘
          ┌───────────────┬───────┴───────┬───────────────┐
          ▼               ▼               ▼               ▼
-   [ UI Lane ]   [ Core Logic ]    [ Data Lane ]   [ QA / Audit ]
-   - Ergonomics   - Algorithms     - Schemas       - Full-Repo
-   - A11y / CSS   - Concurrency    - Migrations    - Security
-   - Interactions - Room / SQL     - L10n bounds   - Reg. Checks
+   [ UI/UX Lane ]  [ Core Logic ]  [ Data Lane ]   [ QA / Audit ]
+   - Claude (Def.) - DeepSeek      - GLM           - Gemini
+   - Visual Mocks  - Algorithms    - Schemas       - Full-Repo
+   - User Sign-Off - Concurrency   - Migrations    - Security
+   - Ergonomics    - Room / SQL    - L10n bounds   - Reg. Checks
 ```
 
 ### Lane Assignment Guidelines:
-*   **UI Lane**: Focuses on view trees, design systems, responsive layouts, accessibility, and user interaction states.
-*   **Core Logic Lane**: Focuses on business rules, algorithms, concurrency, state stores, and computation.
-*   **Data Lane**: Focuses on schemas, data serializations, validation boundaries, and migrations. *(Note: RTL/L10n data contracts belong here; visual RTL mirroring belongs to the UI Lane).*
-*   **QA & Audit Lane**: Full-repo synthesis, security surface audit, edge-case testing, and domain compliance verification.
+*   **UI/UX & Graphic Design Lane (Claude Sonnet default, fallback: Gemini/Antigravity)**: Focuses on visual mockups, design systems, responsive layouts, accessibility (WCAG 2.1 AA), vector icons, and user interaction states.
+*   **Core Logic Lane (OpenCode DeepSeek default)**: Focuses on business rules, algorithms, concurrency, state stores, and computation.
+*   **Data Lane (OpenCode GLM default)**: Focuses on schemas, data serializations, validation boundaries, and migrations. *(Note: RTL/L10n data contracts belong here; visual RTL mirroring belongs to the UI Lane).*
+*   **QA & Audit Lane (Gemini default)**: Full-repo synthesis, security surface audit, edge-case testing, and domain compliance verification.
 
 ---
 

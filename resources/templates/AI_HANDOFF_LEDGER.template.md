@@ -8,7 +8,8 @@ This ledger tracks asynchronous task handoffs, cross-lane critiques, unresolved 
 
 | Entry ID | Timestamp (ISO) | From Lane | To Lane | Scope / Artifacts | Status | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `H-001` | YYYY-MM-DDTHH:MM:SS | Data Lane | UI Lane | `src/models/user.ts` | Completed | Initial User DTO & validator provided |
+| `H-001` | YYYY-MM-DDTHH:MM:SS | UI/UX Lane (Claude) | User / Orchestrator | `docs/mocks/dashboard.html` | Approved | Visual design mock signed off by user |
+| `H-002` | YYYY-MM-DDTHH:MM:SS | Data Lane | UI Lane | `src/models/user.ts` | Completed | Initial User DTO & validator provided |
 
 ---
 

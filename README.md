@@ -28,20 +28,22 @@ flowchart TD
     subgraph Orchestrator["🦅 Principal Consultant & Fleet Orchestrator (Antigravity)"]
         Boot["Phase 0: Engine Bootstrap & Fleet Discovery"]
         Spec["Phase 1: Zero-Presumption Spec & Audit"]
+        MockGate["Phase 1.5: UI/UX Mocking & Visual Gate<br/><i>(User Approval Inviolable)</i>"]
         Plan["Phase 2: Task Partitioning & Lane Allocation"]
         Arbiter["Supreme Arbiter & Final Commit Authority"]
     end
 
-    Boot --> Spec --> Plan
+    Boot --> Spec --> MockGate --> Plan
 
     subgraph FleetLanes["⚡ Specialized Fleet Lanes"]
         direction TB
-        UI["🎨 UI Lane<br/><b>Claude Sonnet</b><br/>• Ergonomics & Layouts<br/>• WCAG 2.1 AA a11y<br/>• Interaction States"]
-        Logic["🧠 Core Logic Lane<br/><b>OpenCode DeepSeek</b><br/>• Business Algorithms<br/>• Concurrency & Threads<br/>• Query & State Optimization"]
-        Data["📊 Data Lane<br/><b>OpenCode GLM</b><br/>• Schema Migrations<br/>• DTOs & Serialization<br/>• Input Boundary Validation"]
+        UI["🎨 UI/UX & Graphic Design Lane<br/><b>Claude 3.5 Sonnet (Default)</b><br/>• Layouts, Mockups & SVGs<br/>• WCAG 2.1 AA a11y<br/>• User-Approved Prototypes"]
+        Logic["🧠 Core Logic Lane<br/><b>OpenCode DeepSeek / Codex</b><br/>• Business Algorithms<br/>• Concurrency & Threads<br/>• Query & State Optimization"]
+        Data["📊 Data Lane<br/><b>OpenCode GLM / GPT-4o</b><br/>• Schema Migrations<br/>• DTOs & Serialization<br/>• Input Boundary Validation"]
         Audit["🛡️ QA & Audit Lane<br/><b>Gemini 1.5 Pro / Flash</b><br/>• Full-Repo Synthesis<br/>• Threat Modeling (OWASP)<br/>• Regulatory Domain Verification"]
     end
 
+    MockGate -.->|"Presents Standalone Mock"| UI
     Plan --> UI
     Plan --> Logic
     Plan --> Data
@@ -59,6 +61,7 @@ flowchart TD
     Arbiter --> Verify["Phase 4 & 5: Platform Stress Testing & Final Commit"]
 
     style Orchestrator fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+    style MockGate fill:#f59e0b,stroke:#fbbf24,stroke-width:2px,color:#000
     style FleetLanes fill:#0f172a,stroke:#64748b,stroke-width:1px,color:#f8fafc
     style Arbiter fill:#e11d48,stroke:#fda4af,stroke-width:2px,color:#fff
 ```
@@ -105,7 +108,8 @@ sequenceDiagram
     autonumber
     actor Dev as Developer / User
     participant Orch as 🦅 Antigravity Orchestrator
-    participant Lanes as 👥 Fleet Lanes (UI / Logic / Data)
+    participant UILane as 🎨 UI/UX Lane (Claude Default)
+    participant Lanes as 👥 Fleet Lanes (Logic / Data)
     participant QA as 🛡️ QA & Audit Lane
     participant Ledger as 📜 Governance Ledger (.agents/)
 
@@ -114,8 +118,16 @@ sequenceDiagram
     Orch->>Ledger: Generate AGENTS.md & AI_HANDOFF_LEDGER.md
     Note over Orch: Phase 1: Zero-Presumption Audit
     Orch->>Ledger: Formulate SPEC_AND_AUDIT.md
-    Note over Orch: Phase 2: Partition Tasks
-    Orch->>Ledger: Populate PLAN_TASKS.md
+
+    rect rgb(45, 30, 60)
+        Note over Orch,UILane: Phase 1.5: UI/UX & Graphic Mocking (Visual Gate)
+        Orch->>UILane: Request Standalone Mockup (HTML/CSS/SVG)
+        UILane->>Dev: Present Interactive Mockup & File Path
+        Dev-->>Orch: Review & Sign-Off (APPROVED)
+    end
+
+    Note over Orch: Phase 2: Partition Tasks (Mock Bound to Plan)
+    Orch->>Ledger: Populate PLAN_TASKS.md (Ref: Approved Mock)
 
     rect rgb(30, 41, 59)
         Note over Lanes,QA: Phase 3: Delegated Execution & Peer Review
@@ -182,7 +194,8 @@ skills/multi-agent-collaborative-audit/
 │   └── measure_metrics.py            # Local telemetry parser & single-page web server
 ├── references/
 │   ├── ponytail_ladder.md            # In-depth guide for the 7-Rung Ponytail Ladder
-│   └── domain_packs.md               # Specifications for Clinical, FinTech, Systems packs
+│   ├── domain_packs.md               # Specifications for Clinical, FinTech, Systems packs
+│   └── ui_ux_mocking.md              # UI/UX Mocking, Claude routing & Visual Gate protocol
 └── resources/
     ├── dashboard/
     │   └── index.html                # Single-Page Application (SPA) Cockpit UI
