@@ -13,18 +13,20 @@ This ledger tracks asynchronous task handoffs, cross-lane critiques, unresolved 
 
 ---
 
-## 2. Peer Review & Critique Tracking (Max 2 Rounds)
+## 2. Peer Review, Adversarial Diff Audit & Bug Hunt (Max 2 Rounds)
 
 ### Task ID: `[TASK-ID]`
-* **Author Lane**: `[e.g., UI Lane]`
-* **Reviewer Lane**: `[e.g., QA Lane]`
-* **Round 1 Critique**:
-  * *Findings*: `[List issues]`
-  * *Classification*: `[Hard Blocker | Deferred Shortcut]`
-  * *Author Action Taken*: `[Fix details]`
+* **Author Lane**: `[e.g., UI Lane / Core Logic Lane]`
+* **Adversarial Reviewer Lane**: `[e.g., QA Lane / Data Lane]`
+* **Zero-Presumption Check**: Verified requirement independently from scratch without inheriting author assumptions.
+* **Round 1 Bug Hunt & Diff Audit**:
+  * *Audit Scope*: `[List files and diff ranges inspected]`
+  * *Discovered Defects & Fragilities*: `[Regressions, null states, L10n leaks, narrow-screen clipping, a11y]`
+  * *Classification*: `[Hard Blocker | Deferred Shortcut | PASS]`
+  * *Author Action Taken*: `[Fix details applied to git diff]`
 * **Round 2 Verification**:
   * *Status*: `[PASSED | DEADLOCKED]`
-* **Arbiter Ruling** *(if deadlocked)*:
+* **Arbiter Ruling** *(if deadlocked after Round 2)*:
   * *Antigravity Verdict*: `[Binding decision & code override]`
 
 ---

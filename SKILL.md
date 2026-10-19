@@ -114,13 +114,19 @@ Every lane must consult both [ponytail_ladder.md](./references/ponytail_ladder.m
 > [!IMPORTANT]
 > **Safety Over Minimalism**: The Ponytail Engine strictly forbids cutting input validation, error handling, security checks, accessibility labels, or clinical/financial precision.
 
-### 2. Peer Review & Anti-Infinite-Critique Protocol
-To prevent endless review loops:
+### 2. Cross-Model Adversarial Diff Audit & Anti-Infinite-Critique Protocol
+To ensure rigorous bug hunting while preventing endless review loops:
+*   **Zero-Presumption Tabula Rasa**: The reviewing model lane must evaluate the git diff and the original user requirement as if reading them for the very first time. **Do not inherit the implementing model's assumptions or rationales.** Reviewers must first understand *why* the requirement exists, question the fundamental architecture/logic chosen, and actively probe for failure modes.
+*   **Mandatory Bug Hunt Scope**:
+    1. *Regressions & State Hazards*: Unhandled nulls, concurrency race conditions, memory leaks, or broken component lifecycles.
+    2. *Domain & Localization Boundary Leaks*: Untranslated hardcoded strings, broken bidirectional text (RTL/LTR), or accidental corruption of protected domains (e.g. Clinical references, patient names, legal disclaimers, or standardized export formats).
+    3. *Visual & Responsive Deficiencies*: Text clipping, truncation, overlapping cards on narrow viewports (320dp/360dp), and missing touch targets (< 48dp).
+    4. *Accessibility (a11y) & Usability*: Missing screen-reader semantics, broken keyboard/IME navigation.
 *   **Capped at 2 Rounds**: A code block or PR may undergo at most **2 review cycles**.
 *   **Strict Classification**:
     *   **Hard Blocker**: Security vulnerability, data loss risk, regression, missing validation, or domain hazard. *Must be resolved immediately by the implementing lane.*
     *   **Deferred Shortcut**: Optimization, cosmetic styling, or non-critical refactoring. *Tagged as `// ponytail: <path>` and logged in `.agents/AI_HANDOFF_LEDGER.md` under Ponytail Debt.*
-*   **Antigravity Supreme Arbiter Clause**: If lanes disagree after Round 2 (e.g., cross-lane blame), the orchestrator immediately steps in, issues a definitive verdict, and writes the resolving patch directly.
+*   **Antigravity Supreme Arbiter Clause**: If lanes disagree or deadlock after Round 2 (e.g., cross-lane blame), the orchestrator immediately steps in, issues a definitive binding verdict, and writes the resolving patch directly.
 
 ### 3. Fast-Path Hotfix Protocol (Trivial Task Bypass)
 To avoid unnecessary latency and token expenditure on trivial changes:
