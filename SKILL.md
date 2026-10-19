@@ -132,9 +132,10 @@ To avoid unnecessary latency and token expenditure on trivial changes:
 
 ### 1. Cross-Platform Stress Verification
 1.  Run build and static analyzers:
-    *   `dart analyze` / `npm run lint` / `cargo check` / `mvn test`.
+    *   `dart analyze` / `npm run lint` / `cargo check` / `mvn test` / `./gradlew test`.
 2.  Verify edge cases identified in `SPEC_AND_AUDIT.md`.
-3.  Ensure zero lint warnings introduced by governance comments.
+3.  **Narrow-Screen & Responsive Guard**: For any UI or mobile alterations, run automated viewport tests or Robolectric suites at $320\text{dp}$ and $360\text{dp}$ to verify zero text clipping, zero button overflow, and proper IME keyboard dismissal.
+4.  Ensure zero lint warnings introduced by governance comments.
 
 ### 2. Non-Destructive Provenance
 *   **Do NOT inject unparsed header comments** (e.g., `// @AI-Implementer`) into source files where it violates project style guides, license header linters, or non-commentable formats (JSON, YAML).
@@ -147,18 +148,21 @@ To avoid unnecessary latency and token expenditure on trivial changes:
     X-Audited-By: Antigravity-Orchestrator"
     ```
 
-### 3. Telemetry & Performance Measurement
+### 3. Telemetry, Competition Leaderboard & Performance Measurement
 Run the telemetry engine to measure execution health and launch the evidence dashboard:
 *   **Execution**: `./scripts/measure_metrics.py` (launches single-page web cockpit on `127.0.0.1:8420`).
 *   **CLI / CI Mode**: `./scripts/measure_metrics.py --json` or `./scripts/measure_metrics.py --export-html report.html`.
 *   **Scorecard Targets**: Simplicity Index $\ge 70\%$, Arbiter Escalations $\le 10\%$, First-Turn Pass $\ge 70\%$.
+*   **Gamified Championship Leaderboard**: Maintain `.agents/MACA_TOURNAMENT_LEADERBOARD.md` (see [template](./resources/templates/MACA_TOURNAMENT_LEADERBOARD.template.md)) to award points across lanes for critical defect catches (+50 pts), state/concurrency fixes (+30 pts), narrow-screen/a11y catches (+20 pts), and deterministic test cases (+25 pts).
 
 ### 4. Final Verification Checklist
 Before concluding, the orchestrator verifies:
 - [ ] `./scripts/bootstrap.sh` or fallback was executed.
-- [ ] `.agents/SPEC_AND_AUDIT.md` reflects true zero-presumption findings.
+- [ ] `.agents/SPEC_AND_AUDIT.md` reflects true zero-presumption findings and offline-first lifecycle.
 - [ ] `.agents/PLAN_TASKS.md` tasks were completed by their designated lanes (or Fast-Path applied).
+- [ ] Phase 1.5 UI/UX mock was signed off by the user before coding (for UI tasks).
 - [ ] Ponytail Ladder was honored; no bloat or obfuscated code introduced.
+- [ ] Narrow-screen ($320\text{dp}$/$360\text{dp}$) responsive tests pass cleanly.
 - [ ] Hard blockers resolved; deferred shortcuts documented in `AI_HANDOFF_LEDGER.md`.
-- [ ] Telemetry measured via `./scripts/measure_metrics.py`.
+- [ ] Telemetry measured via `./scripts/measure_metrics.py` and leaderboard updated.
 - [ ] All tests and linters pass cleanly.

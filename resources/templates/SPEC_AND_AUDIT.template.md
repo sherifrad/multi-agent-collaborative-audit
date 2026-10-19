@@ -20,6 +20,7 @@
 ## 3. The Target Specification
 * **Component / Interface Contracts**: `[Exact TypeScript / Kotlin / Dart / Python signatures]`
 * **State Management & Data Flow**: `[Unidirectional state flow diagram or description]`
+* **Offline-First Lifecycle Contract**: `[Differentiate Session Invalidation (ephemeral logout) vs Account Deletion (persistent vault wipe)]`
 * **Error Handling & Failure Modes**: `[How every edge case is handled and reported]`
 * **Accessibility & UX Requirements**: `[Focus management, contrast, keyboard traps, tap targets]`
 
@@ -28,6 +29,7 @@
 * **Mock Artifact Path**: `[docs/mocks/<feature>-mock.html or svg]`
 * **User Approval Status**: `[PENDING | APPROVED | REJECTED]`
 * **User Feedback / Adjustments**: `[User comments or signed-off state before task breakdown]`
+* **Narrow-Screen & Bedside Verification**: `[Verified on 360dp / 320dp widths, glove-friendly touch targets >= 48dp]`
 
 ---
 
@@ -36,3 +38,5 @@
 | :--- | :--- | :--- | :--- | :--- |
 | `TC-01` | Validate empty array input | Data Lane | Unit Test | Returns empty response, status 200 |
 | `TC-02` | Screen reader focus announcement | UI Lane | Accessibility Audit | Semantic label read cleanly |
+| `TC-03` | Narrow-screen layout regression | UI/QA Lane | Narrow Viewport Test (360dp) | Zero text clipping, zero button overflow |
+| `TC-04` | Offline-first logout persistence | Logic/Data Lane | Lifecycle Integration Test | Session cleared, credentials preserved in vault |

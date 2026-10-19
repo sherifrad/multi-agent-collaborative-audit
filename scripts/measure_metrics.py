@@ -109,6 +109,7 @@ def check_has_governance(dir_path: Path) -> bool:
         dir_path / "AI_HANDOFF_LEDGER.md",
         dir_path / "SPEC_AND_AUDIT.md",
         dir_path / "PLAN_TASKS.md",
+        dir_path / "MACA_TOURNAMENT_LEADERBOARD.md",
         dir_path / ".agents",
         dir_path / ".agent",
         dir_path / "SKILL.md"
@@ -117,7 +118,7 @@ def check_has_governance(dir_path: Path) -> bool:
 
 
 def parse_ledger(repo_dir: Path) -> dict:
-    """Parses AI_HANDOFF_LEDGER.md for handoffs and Ponytail debt."""
+    """Parses AI_HANDOFF_LEDGER.md and tournament leaderboard for metrics."""
     candidates = [
         repo_dir / "AI_HANDOFF_LEDGER.md",
         repo_dir / ".agents" / "AI_HANDOFF_LEDGER.md",
@@ -134,9 +135,23 @@ def parse_ledger(repo_dir: Path) -> dict:
         critique_rounds = re.findall(r"Round \d+", content)
         debt_items = re.findall(r"// ponytail:", content)
 
+    # Leaderboard points tracking
+    board_candidates = [
+        repo_dir / ".agents" / "MACA_TOURNAMENT_LEADERBOARD.md",
+        repo_dir / "MACA_TOURNAMENT_LEADERBOARD.md",
+        repo_dir / "resources" / "templates" / "MACA_TOURNAMENT_LEADERBOARD.template.md"
+    ]
+    board_file = next((b for b in board_candidates if b.exists()), None)
+    tournament_points = 0
+    if board_file and board_file.exists():
+        board_text = board_file.read_text(encoding="utf-8", errors="ignore")
+        for match in re.findall(r"\*\*(\d+)\s*pts\*\*", board_text):
+            tournament_points += int(match)
+
     return {
         "critique_count": len(critique_rounds),
-        "debt_count": len(debt_items)
+        "debt_count": len(debt_items),
+        "tournament_points": tournament_points
     }
 
 

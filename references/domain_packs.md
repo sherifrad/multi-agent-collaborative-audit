@@ -35,6 +35,14 @@ The orchestrator dynamically selects and applies domain-specific audit rules dur
 * **Clinical Lane Mandatory Checks**:
   * **Dosage & Unit Integrity**: Strict unit typing (e.g., `mg` vs `mcg` vs `mL` with no implicit float coercion).
   * **Fail-Safe Fallbacks**: If network or sensor data drops, clinical UI must display explicit "STALE DATA" warnings rather than caching old vitals without timestamps.
+  * **Offline-First Authentication & Shift Handovers**: 
+    - Shared tablet support: Delivery ward tablets are shared by multiple clinicians across shifts.
+    - Session vs Account distinction: Clinical logout (`clearSession`) must **never** wipe offline doctor credential vaults (`AccountStore`), preventing shift lockout during emergency power or internet outages.
+    - Zero plain-text credentials in logs or Firestore documents.
+  * **Bedside Ergonomics & Narrow Screens**:
+    - Glove-friendly inputs: Primary steppers and presets with $\ge 48\text{dp}$ touch targets.
+    - Narrow-screen resilience: Test against $320\text{dp}$ and $360\text{dp}$ viewports to prevent vital sign clipping or horizontal truncation.
+    - Anti-Aesthetic Inflation: Avoid high-CPU animated blurs, pulsing waves, or glassmorphism that drain battery or distract under surgical lights.
   * **HIPAA / GDPR Health Data**: No PHI/PII in log files, crash reports, or analytics payloads. Encryption at rest and in transit (TLS 1.3).
   * **Audit Logging**: Immutable, tamper-evident audit logs for every user action affecting patient state or medical orders.
 
