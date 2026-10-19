@@ -100,15 +100,16 @@ The orchestrator partitions work into atomic, decoupled tasks documented in `.ag
 
 ## Phase 3: Delegated Execution & The Ponytail Engine
 
-### 1. The 7-Rung Ponytail Minimalism Protocol
-Every lane must consult [ponytail_ladder.md](./references/ponytail_ladder.md) before writing code:
-1.  **YAGNI**: Cut speculative parameters, premature abstractions, and unused flags.
-2.  **Existing Helper**: Reuse existing repo functions and styles.
-3.  **Standard Library**: Prefer native language primitives over external micro-libraries.
-4.  **Native Platform / OS**: Leverage platform APIs (CSS grid, Android insets, native browser events).
-5.  **Pre-Installed Dependency**: Do not add new packages if an installed package suffices.
-6.  **Atomic Functional Primitive**: Write clean, readable, single-responsibility functions. *Do not write obfuscated one-liners.*
-7.  **Minimum High-Performance Custom**: Use bespoke optimizations only when benchmarked bottlenecks require it.
+### 1. The 7-Rung Ponytail Minimalism Protocol & Coding Guidelines
+Every lane must consult both [ponytail_ladder.md](./references/ponytail_ladder.md) and [coding_guidelines.md](./references/coding_guidelines.md) before writing code:
+1.  **Idiomatic Code & Clean Architecture**: Follow language conventions (Kotlin/Compose, TypeScript, Python) strictly: UDF state hoisting, immutability, explicit typing, zero empty catches, and clear package boundaries (`ui`, `data`, `domain`).
+2.  **YAGNI**: Cut speculative parameters, premature abstractions, and unused flags.
+3.  **Existing Helper**: Reuse existing repo functions and styles.
+4.  **Standard Library**: Prefer native language primitives over external micro-libraries.
+5.  **Native Platform / OS**: Leverage platform APIs (Compose insets, Android Keystore, native browser events).
+6.  **Pre-Installed Dependency**: Do not add new packages if an installed package suffices.
+7.  **Atomic Functional Primitive**: Write clean, readable, single-responsibility functions. *Do not write obfuscated one-liners.*
+8.  **Minimum High-Performance Custom**: Use bespoke optimizations only when benchmarked bottlenecks require it.
 
 > [!IMPORTANT]
 > **Safety Over Minimalism**: The Ponytail Engine strictly forbids cutting input validation, error handling, security checks, accessibility labels, or clinical/financial precision.
