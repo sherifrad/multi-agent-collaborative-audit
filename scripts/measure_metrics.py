@@ -102,16 +102,34 @@ def get_git_evidence(repo_dir: Path) -> tuple[list, dict]:
     return evidence, lane_distribution
 
 
+def check_has_governance(dir_path: Path) -> bool:
+    """Checks if project has MACA or Agent governance files in root or .agents/."""
+    candidates = [
+        dir_path / "AGENTS.md",
+        dir_path / "AI_HANDOFF_LEDGER.md",
+        dir_path / "SPEC_AND_AUDIT.md",
+        dir_path / "PLAN_TASKS.md",
+        dir_path / ".agents",
+        dir_path / ".agent",
+        dir_path / "SKILL.md"
+    ]
+    return any(c.exists() for c in candidates)
+
+
 def parse_ledger(repo_dir: Path) -> dict:
-    """Parses .agents/AI_HANDOFF_LEDGER.md for handoffs and Ponytail debt."""
-    ledger_file = repo_dir / ".agents" / "AI_HANDOFF_LEDGER.md"
-    if not ledger_file.exists():
-        ledger_file = repo_dir / "resources" / "templates" / "AI_HANDOFF_LEDGER.template.md"
+    """Parses AI_HANDOFF_LEDGER.md for handoffs and Ponytail debt."""
+    candidates = [
+        repo_dir / "AI_HANDOFF_LEDGER.md",
+        repo_dir / ".agents" / "AI_HANDOFF_LEDGER.md",
+        repo_dir / ".agent" / "AI_HANDOFF_LEDGER.md",
+        repo_dir / "resources" / "templates" / "AI_HANDOFF_LEDGER.template.md"
+    ]
+    ledger_file = next((c for c in candidates if c.exists()), None)
 
     critique_rounds = []
     debt_items = []
 
-    if ledger_file.exists():
+    if ledger_file and ledger_file.exists():
         content = ledger_file.read_text(encoding="utf-8", errors="ignore")
         critique_rounds = re.findall(r"Round \d+", content)
         debt_items = re.findall(r"// ponytail:", content)
@@ -148,7 +166,7 @@ def scan_related_projects(base_dir: Path) -> list:
                         except Exception:
                             pass
 
-                        has_agents = (item / ".agents").exists() or (item / "SKILL.md").exists()
+                        has_agents = check_has_governance(item)
                         related.append({
                             "name": item.name,
                             "path": sanitize_path(str(item)),
@@ -240,7 +258,7 @@ def browse_filesystem(path_str: str = "") -> dict:
                     if entry.is_dir(follow_symlinks=False):
                         p = Path(entry.path)
                         is_git = (p / ".git").exists()
-                        is_maca = (p / ".agents").exists() or (p / "SKILL.md").exists()
+                        is_maca = check_has_governance(p)
                         subdirs.append({
                             "name": entry.name,
                             "path": sanitize_path(entry.path),
@@ -256,7 +274,7 @@ def browse_filesystem(path_str: str = "") -> dict:
         "current_path": sanitize_path(str(current)),
         "parent_path": sanitize_path(parent_path) if parent_path else None,
         "is_git": (current / ".git").exists(),
-        "is_maca": (current / ".agents").exists() or (current / "SKILL.md").exists(),
+        "is_maca": check_has_governance(current),
         "subdirectories": subdirs[:50]
     }
 
