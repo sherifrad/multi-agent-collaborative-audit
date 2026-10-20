@@ -196,7 +196,8 @@ skills/multi-agent-collaborative-audit/
 │   ├── ponytail_ladder.md            # In-depth guide for the 7-Rung Ponytail Ladder
 │   ├── domain_packs.md               # Specifications for Clinical, FinTech, Systems packs
 │   ├── ui_ux_mocking.md              # UI/UX Mocking, Claude routing & Visual Gate protocol
-│   └── coding_guidelines.md          # Clean code, UDF architecture & idiomatic guidelines
+│   ├── coding_guidelines.md          # Clean code, UDF architecture & idiomatic guidelines
+│   └── deep_diagnostics.md           # Low-level Logcat, Memory, Crashlytics & Pre-Release testing
 └── resources/
     ├── dashboard/
     │   └── index.html                # Single-Page Application (SPA) Cockpit UI

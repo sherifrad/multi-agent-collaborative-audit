@@ -30,3 +30,8 @@ This document defines the roles, active lanes, and operational constraints for m
      3. *Visual & Responsive Deficiencies*: Text clipping, truncation, overlapping cards on narrow viewports (320dp/360dp), and missing touch targets (< 48dp).
      4. *Accessibility (a11y) & Usability*: Missing screen-reader semantics, broken keyboard/IME navigation.
    - Findings must be recorded in `.agents/AI_HANDOFF_LEDGER.md` with explicit `PASS` or `BLOCKER` designations before commit authorization. A `BLOCKER` halts git commit until patched or arbitrated.
+7. **Phase 4.5 Deep Diagnostics & Tool Discovery Gate**:
+   - Before final stable release or production commits, prompt the user for permission to run Phase 4.5 Deep Testing.
+   - Pre-flight inspect available diagnostic skills (`android-profiler`, `android-cli`, `firebase-crashlytics`, `testing-setup`, `a11y-debugging`).
+   - If missing, suggest installation and discover any project-specific testing plugins.
+   - Execute the 4 pillars (Logcat silent bug hunt, Memory/Jank leak audit, Crashlytics telemetry, Deep unit test assertion audit).

@@ -135,7 +135,7 @@ To avoid unnecessary latency and token expenditure on trivial changes:
 
 ---
 
-## Phase 4 & 5: Platform Stress Testing, Telemetry & Final Commit
+## Phase 4 & 5: Platform Stress Testing, Deep Diagnostics & Final Commit
 
 ### 1. Cross-Platform Stress Verification
 1.  Run build and static analyzers:
@@ -144,7 +144,20 @@ To avoid unnecessary latency and token expenditure on trivial changes:
 3.  **Narrow-Screen & Responsive Guard**: For any UI or mobile alterations, run automated viewport tests or Robolectric suites at $320\text{dp}$ and $360\text{dp}$ to verify zero text clipping, zero button overflow, and proper IME keyboard dismissal.
 4.  Ensure zero lint warnings introduced by governance comments.
 
-### 2. Non-Destructive Provenance
+### 2. Phase 4.5: Deep Release Verification Gate (On-Demand Diagnostics)
+Prior to final stable release tagging or production deployment, the fleet can trigger an in-depth low-level audit.
+*   **Mandatory User Consent Gate**: Because low-level diagnostics, heap profiling, and exhaustive log audits consume significant resources and tokens, the orchestrator **must ask the user for permission** before running Phase 4.5.
+*   **Testing Skills & Plugins Pre-Flight Check**:
+    1.  Probe environment for diagnostic skills: `android-profiler`, `android-cli`, `firebase-crashlytics`, `testing-setup`, `a11y-debugging`.
+    2.  If missing, prompt the user with recommendations to install or enable the relevant skill/plugin.
+    3.  Dynamically discover any project-specific testing tools (Playwright, Cypress, Flutter driver).
+*   **Fleet Execution Pillars** (Detailed in [deep_diagnostics.md](./references/deep_diagnostics.md)):
+    *   *Pillar A (Core Logic)*: ADB Logcat silent error hunt (`*:E`, `FATAL`, `runCatching` silences, `StrictMode` disk-on-main violations).
+    *   *Pillar B (UI/UX)*: Memory leaks, heap allocation stability, `Choreographer` frame drop / jank analysis, touch target sanity.
+    *   *Pillar C (QA/Audit)*: Firebase Crashlytics mapping upload, non-fatal exception wiring, zero-PII health data verification.
+    *   *Pillar D (Data)*: Deep unit test assertion audit (identifying inverted assertions, test suite blind spots, boundary overflows).
+
+### 3. Non-Destructive Provenance
 *   **Do NOT inject unparsed header comments** (e.g., `// @AI-Implementer`) into source files where it violates project style guides, license header linters, or non-commentable formats (JSON, YAML).
 *   **Record all provenance** cleanly in `.agents/AI_HANDOFF_LEDGER.md` and use standard git trailers:
     ```git
@@ -155,14 +168,14 @@ To avoid unnecessary latency and token expenditure on trivial changes:
     X-Audited-By: Antigravity-Orchestrator"
     ```
 
-### 3. Telemetry, Competition Leaderboard & Performance Measurement
+### 4. Telemetry, Competition Leaderboard & Performance Measurement
 Run the telemetry engine to measure execution health and launch the evidence dashboard:
 *   **Execution**: `./scripts/measure_metrics.py` (launches single-page web cockpit on `127.0.0.1:8420`).
 *   **CLI / CI Mode**: `./scripts/measure_metrics.py --json` or `./scripts/measure_metrics.py --export-html report.html`.
 *   **Scorecard Targets**: Simplicity Index $\ge 70\%$, Arbiter Escalations $\le 10\%$, First-Turn Pass $\ge 70\%$.
 *   **Gamified Championship Leaderboard**: Maintain `.agents/MACA_TOURNAMENT_LEADERBOARD.md` (see [template](./resources/templates/MACA_TOURNAMENT_LEADERBOARD.template.md)) to award points across lanes for critical defect catches (+50 pts), state/concurrency fixes (+30 pts), narrow-screen/a11y catches (+20 pts), and deterministic test cases (+25 pts).
 
-### 4. Final Verification Checklist
+### 5. Final Verification Checklist
 Before concluding, the orchestrator verifies:
 - [ ] `./scripts/bootstrap.sh` or fallback was executed.
 - [ ] `.agents/SPEC_AND_AUDIT.md` reflects true zero-presumption findings and offline-first lifecycle.
@@ -170,6 +183,7 @@ Before concluding, the orchestrator verifies:
 - [ ] Phase 1.5 UI/UX mock was signed off by the user before coding (for UI tasks).
 - [ ] Ponytail Ladder was honored; no bloat or obfuscated code introduced.
 - [ ] Narrow-screen ($320\text{dp}$/$360\text{dp}$) responsive tests pass cleanly.
+- [ ] Phase 4.5 Deep Diagnostics offered to user (and executed if approved).
 - [ ] Hard blockers resolved; deferred shortcuts documented in `AI_HANDOFF_LEDGER.md`.
 - [ ] Telemetry measured via `./scripts/measure_metrics.py` and leaderboard updated.
 - [ ] All tests and linters pass cleanly.
