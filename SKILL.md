@@ -186,8 +186,24 @@ Run the telemetry engine to measure execution health and launch the evidence das
 *   **Scorecard Targets**: Simplicity Index $\ge 70\%$, Arbiter Escalations $\le 10\%$, First-Turn Pass $\ge 70\%$.
 *   **Gamified Championship Leaderboard**: Maintain `.agents/MACA_TOURNAMENT_LEADERBOARD.md` (see [template](./resources/templates/MACA_TOURNAMENT_LEADERBOARD.template.md)) to award points across lanes for critical defect catches (+50 pts), state/concurrency fixes (+30 pts), narrow-screen/a11y catches (+20 pts), and deterministic test cases (+25 pts).
 
-### 5. Final Verification Checklist
+### 5. Mandatory Fleet Dispatch Badge & Proof-of-Execution Banner
+To guarantee complete transparency and prove to the user that MACA was actively engaged on every turn, the orchestrator **MUST prepend a standardized Fleet Dispatch Badge** at the very top of its response:
+
+```markdown
+> 🦅 **MACA Active Fleet Dispatch**  
+> • **Tier**: `[Tier 1: Delegate Skills | Tier 2: Subagents | Tier 3: Multi-Session Single-Model]`  
+> • **Phase**: `[Phase 1 Spec | Phase 1.5 UI Gate | Phase 2 Tasks | Phase 3 Implementation | Phase 4.5 Deep Diagnostics]`  
+> • **Active Lanes & Models**:  
+>   - 🎨 **UI/UX Lane**: `[Claude Sonnet / Relay / In-Process]` ➔ `[Task scope]`  
+>   - 🧠 **Core Logic Lane**: `[DeepSeek / OpenCode / In-Process]` ➔ `[Task scope]`  
+>   - 📊 **Data Lane**: `[GLM / OpenCode / In-Process]` ➔ `[Task scope]`  
+>   - 🛡️ **QA & Audit Lane**: `[Gemini / Antigravity Arbiter]` ➔ `[Audit scope]`  
+> • **Ponytail Target**: `[Rung 1-7]` | **Visual Approval Gate**: `[APPROVED / PENDING / N/A]`
+```
+
+### 6. Final Verification Checklist
 Before concluding, the orchestrator verifies:
+- [ ] Mandatory Fleet Dispatch Badge displayed at the top of the response.
 - [ ] `./scripts/bootstrap.sh` or fallback was executed.
 - [ ] `.agents/SPEC_AND_AUDIT.md` reflects true zero-presumption findings and offline-first lifecycle.
 - [ ] `.agents/PLAN_TASKS.md` tasks were completed by their designated lanes (or Fast-Path applied).
