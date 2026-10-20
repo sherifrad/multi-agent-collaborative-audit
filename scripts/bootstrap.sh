@@ -45,22 +45,38 @@ else
     fi
 fi
 
-# 3. Detect available external model CLIs and tools
+# 3. Detect available delegate-skills relays & external model CLIs
+echo "🔎 [Delegate Skills Discovery] Scanning installed delegate relays..."
+FOUND_DELEGATES=0
+for dskill in "claude-delegate" "opencode-delegate" "codex-delegate" "agy-delegate"; do
+    if [ -d "$HOME/.agents/skills/$dskill" ] || [ -d "$HOME/.config/opencode/skills/$dskill" ]; then
+        echo "  ✔️ Detected delegate skill: $dskill"
+        FOUND_DELEGATES=$((FOUND_DELEGATES + 1))
+    fi
+done
+
 echo "🔎 [Fleet Discovery] Scanning available engine runtimes..."
 FOUND_CLIS=0
 
 for cli in "claude" "opencode" "deepseek" "gemini" "codex" "gh"; do
     if command -v "$cli" >/dev/null 2>&1; then
-        echo "  ✔️ Detected runtime CLI: $cli ($(command -v "$cli"))"
+        echo "  ✔️ Detected runtime CLI: $cli"
         FOUND_CLIS=$((FOUND_CLIS + 1))
+    fi
+done
+
+echo "🔎 [Diagnostic Plugins Discovery] Scanning testing & profiling skills..."
+for diag in "android-profiler" "android-cli" "firebase-crashlytics" "testing-setup" "a11y-debugging"; do
+    if [ -d "$HOME/.gemini/config/skills/$diag" ] || [ -d "$HOME/.agents/skills/$diag" ]; then
+        echo "  ✔️ Detected diagnostic skill: $diag"
     fi
 done
 
 if [ "$FOUND_CLIS" -eq 0 ]; then
     echo "ℹ️ No external model CLIs detected in PATH."
-    echo "   Fleet Orchestrator will activate Tier-2 / Tier-3 fallback (Internal Subagents / In-Process Personas)."
+    echo "   Fleet Orchestrator will activate Tier-2 (Subagents) or Tier-3 (Single-Model Multi-Session Tabula Rasa)."
 else
-    echo "✅ Fleet Discovery complete: $FOUND_CLIS runtime CLI(s) available for delegation."
+    echo "✅ Fleet Discovery complete: $FOUND_CLIS runtime CLI(s) and $FOUND_DELEGATES delegate skill(s) available."
 fi
 
 # 4. Final status report

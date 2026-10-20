@@ -1,42 +1,53 @@
 ---
 name: multi-agent-collaborative-audit
 description: >-
-  Spec-driven, Ponytail-optimized, multi-agent engineering and audit skill.
-  Coordinates fleet lane partitioning (Claude UI/UX Mocking, Logic, Data, QA/Audit),
-  User Approval Gate for designs, 3-tier scarcity fallback, dynamic domain packs
-  (clinical, fintech, fullstack), anti-deadlock arbitration, and non-destructive
-  audit trails.
+  DEFAULT master orchestration and audit protocol for all coding, software architecture,
+  UI/UX design, debugging, refactoring, and verification tasks. Automatically triggers on
+  any non-trivial engineering request to coordinate delegate-skills (claude-delegate,
+  opencode-delegate, codex-delegate, agy-delegate), enforce the 5-Phase SDD workflow,
+  Phase 1.5 Visual Approval Gate, 7-Rung Ponytail minimalism, Rule 6 Tabula Rasa adversarial
+  diff audits, 3-tier scarcity fallback (including Single-Model Multi-Session isolation),
+  and Phase 4.5 deep low-level diagnostics.
 ---
 
 # Universal Spec-Driven, Ponytail & Fleet-Delegated Multi-Agent Skill
 
-This skill transforms the orchestrator into a **Principal Consultant & Fleet Orchestrator** managing a collaborative team of specialized agent lanes (UI, Core Logic, Data, QA/Audit). It enforces rigorous specification-driven development (SDD), anti-bloat minimalism via the **Ponytail Engine**, strict anti-deadlock review caps, and non-destructive provenance tracking.
+This skill is the **Default Principal Consultant & Fleet Orchestrator** managing a collaborative team of specialized agent lanes (UI/UX, Core Logic, Data, QA/Audit). It enforces specification-driven development (SDD), anti-bloat minimalism via the **Ponytail Engine**, strict anti-deadlock review caps, and non-destructive provenance tracking.
 
 ---
 
-## Phase 0: Fleet Bootstrap & Governance Setup
+## Phase 0: Fleet Bootstrap, Delegate Skills & Scarcity Cascade
 
 ### 1. Step 0: Non-Blocking Engine Verification & Fleet Discovery
 Before assigning tasks, execute or consult the bootstrap script:
 
 *   **Helper Script**: [bootstrap.sh](./scripts/bootstrap.sh)
-*   **Action**: Execute `./scripts/bootstrap.sh` to probe local runtimes, inspect `~/.config/delegate-skills`, and discover available CLIs (`opencode`, `claude`, `codex`, `gemini`, `gh`).
-*   **Non-Blocking Guarantee**: If script execution is restricted or if external CLIs are absent, the orchestrator **must not halt**. Instead, it seamlessly activates the **3-Tier Scarcity Cascade**.
+*   **Action**: Execute `./scripts/bootstrap.sh` to probe local runtimes, inspect `~/.config/delegate-skills` and `~/.agents/skills/*-delegate`, discover available CLIs (`opencode`, `claude`, `codex`, `gemini`, `gh`), and check diagnostic skills (`android-profiler`, `android-cli`, `firebase-crashlytics`, `testing-setup`).
+*   **Non-Blocking Guarantee**: Never assume all external models or CLIs exist. If any CLI or model is missing, seamlessly cascade through the **3-Tier Scarcity Resolution Cascade**.
 
 ### 2. The 3-Tier Scarcity Resolution Cascade
-The orchestrator determines the execution engine based on environment capabilities:
+The orchestrator dynamically adapts to the host environment without failing:
 
 ```
-[Tier 1: Full Fleet Discovery]
-Detected external CLIs (e.g., OpenCode, Claude, Codex, Gemini)
-       │ (if unavailable)
+[Tier 1: Delegate-Skills & External CLI Fleet]
+Dispatches tasks via file-based relay scripts:
+• claude-delegate   ➔ UI/UX & Graphic Mocking Lane
+• opencode-delegate ➔ Core Logic (DeepSeek) & Data (GLM) Lanes
+• codex-delegate    ➔ Systems / Algorithmic Lane
+• agy-delegate      ➔ Independent Read-Only QA & Audit Lane
+       │ (if external CLIs or delegate relays are unavailable)
        ▼
 [Tier 2: Native Agent Platform Subagents]
-Antigravity subagents invoked with lane-specific role prompts and workspaces
-       │ (if subagents restricted)
+Spawns isolated subagents (via invoke_subagent) in separate workspaces/branches,
+each bound to a dedicated lane persona and strict Tabula Rasa scope.
+       │ (if only a single model is available without subagents)
        ▼
-[Tier 3: In-Process Synthetic Multi-Persona Emulation]
-Sequential role-based reasoning passes within the single agent context
+[Tier 3: Single-Model Multi-Session Tabula Rasa Isolation]
+Uses the single available model across separate sessions or strict context resets:
+• Session A (Implementer): Writes the bounded code slice and outputs raw git diff.
+• Session B (Adversarial Auditor): Starts with a clean Tabula Rasa prompt containing
+  ONLY the user requirement and the git diff (zero access to Session A's reasoning),
+  performing an unbiased Rule 6 bug hunt.
 ```
 
 ### 3. Governance Artifacts Initialization

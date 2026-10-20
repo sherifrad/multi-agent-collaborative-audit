@@ -170,11 +170,11 @@ Never crash when external CLIs or specific models are unavailable:
 
 ```mermaid
 flowchart TD
-    Start["Launch Task"] --> T1{"Tier 1: External CLIs Available?<br/>(opencode, claude, codex, gemini)"}
-    T1 -- Yes --> E1["Spawn Dedicated Fleet Engine Instances"]
+    Start["Launch Task"] --> T1{"Tier 1: Delegate Skills & CLIs Available?<br/>(claude-delegate, opencode-delegate, codex-delegate, agy-delegate)"}
+    T1 -- Yes --> E1["Dispatch via File-Based Delegate Relay Scripts"]
     T1 -- No --> T2{"Tier 2: Platform Subagents Available?<br/>(Antigravity invoke_subagent)"}
-    T2 -- Yes --> E2["Spawn Subagents with Dedicated Role Personas & Workspaces"]
-    T2 -- No --> T3["Tier 3: In-Process Synthetic Multi-Persona Emulation<br/>(Sequential role-rotation within single context)"]
+    T2 -- Yes --> E2["Spawn Isolated Subagents with Dedicated Role Personas & Workspaces"]
+    T2 -- No --> T3["Tier 3: Single-Model Multi-Session Tabula Rasa<br/>(Session A: Implementer ➔ Session B: Clean-Context Adversarial Reviewer)"]
 
     style T1 fill:#3b82f6,color:#fff
     style T2 fill:#8b5cf6,color:#fff
