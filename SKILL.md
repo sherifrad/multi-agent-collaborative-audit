@@ -21,21 +21,23 @@ Coordinate specialized agent lanes (`UI/UX`, `Core Logic`, `Data`, `QA & E2E Aud
    * **Entry Checkpoint (Phase 0)**: Run `python3 ./scripts/skill_ambassador_auditor.py --init-log <workspace_dir> --feature "<feature_name>"` before planning or coding to lock the 9 mandatory gates (`G-01` to `G-09`).
    * **Exit Checkpoint (Phase 4/5)**: Before marking any task `[x]` or concluding the turn, run `python3 ./scripts/skill_ambassador_auditor.py --audit-workspace <workspace_dir>` and record each agent lane's compliance score and any skill friction in `.agents/SKILL_COMPLIANCE_LOG.md`. If the Ambassador returns `BLOCKED_BY_SKILL_VIOLATIONS`, **halt and remediate the skipped gate immediately**.
 2. **Anti-Fake-Review Lock**: Never mark all lanes `[In-Process]` in a single turn to self-approve your own code. Every review in `.agents/AI_HANDOFF_LEDGER.md` must cite actual CLI output, subagent output, or deterministic command evidence.
-3. **Fail-Closed Script Protocol**: Whenever `./scripts/bootstrap.sh`, `./scripts/scenario_and_callchain_engine.py`, `./scripts/skill_ambassador_auditor.py`, or `./scripts/measure_metrics.py` returns a non-zero exit code or outputs `MACA_SCRIPT_ERROR`, **STOP IMMEDIATELY**. Run the script with `--self-test`, fix the input or environment issue, and re-run until `PASS` (`exit code 0`).
+3. **Fail-Closed Script Protocol**: Whenever `./scripts/bootstrap.sh`, `./scripts/scenario_and_callchain_engine.py`, `./scripts/skill_ambassador_auditor.py`, `./scripts/fleet_dispatch.py`, or `./scripts/measure_metrics.py` returns a non-zero exit code or outputs `MACA_SCRIPT_ERROR`, **STOP IMMEDIATELY**. Run the script with `--self-test`, fix the input or environment issue, and re-run until `PASS` (`exit code 0`).
 4. **Task Queue Lock (`current_task.md`)**: Read `tasks/current_task.md` (or `.agents/PLAN_TASKS.md`) before starting. Execute unchecked items (`- [ ]`) in priority order. Update `- [ ]` to `- [x]` with inline command/date evidence only after Phase 4 and the Skill Ambassador Exit Checkpoint pass.
 
-## Phase 0: One-Time First-Run Diagnostic & 3-Tier Scarcity Cascade
+## Phase 0: One-Time First-Run Diagnostic & Dynamic Fleet Router
 
 1. **One-Time First-Run Deep Diagnostic (`first_run_preflight.py`)**:
    * Execute `./scripts/bootstrap.sh` (which invokes `python3 ./scripts/first_run_preflight.py`).
-   * **On First Use (or after any script edit / `--force-first-run`)**: The script verifies that all 25+ internal skill files, Python engines, and vendored Node relays (`vendor/delegate-skills/skills/*-delegate/scripts/relay.mjs`) exist in their exact locations and pass `--self-test`, and audits all external CLIs and E2E tools (`opencode`, `codex`, `claude`, `agy`, `gemini`, `playwright`, `e2e`, `adb`, `maestro`).
+   * **On First Use (or after any script edit / `--force-first-run`)**: The script verifies that all internal skill files, Python engines (`measure_metrics.py`, `scenario_and_callchain_engine.py`, `skill_ambassador_auditor.py`, `fleet_dispatch.py`), and vendored Node relays exist in their exact locations and pass `--self-test`, and audits all external CLIs and E2E tools (`opencode`, `codex`, `claude`, `agy`, `gemini`, `playwright`, `e2e`, `adb`, `maestro`).
    * **No Silent Fallback on Missing Tools (إلزامية إخطار المستخدم بالأدوات الناقصة وطرق حلها)**: If `first_run_preflight.py` reports **any** missing or non-working tool in `missing_external_tools` (or `broken_scripts`), you are **STRICTLY FORBIDDEN from silently ignoring it and working around it without telling the user**. You MUST display a concise table of the missing tools, their impact, and their exact copy-paste installation/fix commands (`remediation`), and ask whether the user wants to fix/install them first or proceed with the available working tools.
    * **On Subsequent Runs**: Once `.first_run_verified.json` is stamped, `bootstrap.sh` automatically uses the fast path (`<0.1s`) unless `--force-first-run` is passed.
 2. Initialize `.agents/SKILL_COMPLIANCE_LOG.md` via `skill_ambassador_auditor.py --init-log`, plus `.agents/AGENTS.md` and `.agents/AI_HANDOFF_LEDGER.md` from `resources/templates/`.
-3. Route tasks via the highest available tier:
-   * **Tier 1 (Vendored Delegate Relays & External CLIs)**: Dispatch bounded briefs using `node ./vendor/delegate-skills/skills/<skill>-delegate/scripts/relay.mjs --brief <brief.txt> --cd <repo_path>` for `claude-delegate` (UI/UX), `opencode-delegate` (Core Logic / Data), `codex-delegate` (Systems), and `agy-delegate` (QA, E2E & Skill Ambassador Referee).
-   * **Tier 2 (Platform Subagents)**: Isolated subagents per lane with clean Tabula Rasa context.
-   * **Tier 3 (Two-Step Tabula Rasa Verification)**: Step A writes code and outputs `git diff`; Step B executes deterministic verification commands and audits the raw diff without inheriting Step A's assumptions.
+3. **Dynamic Multi-Adapter Fleet Routing (`scripts/fleet_dispatch.py`)**:
+   * Route tasks via `.agents/fleet.json` (template: `resources/templates/fleet.template.json`) using `python3 scripts/fleet_dispatch.py --dispatch <lane> --brief <brief>`:
+     * **Adapter A (CLIs)**: Spawns installed tools (`claude`, `opencode`, `codex`, `agy`, `cursor`, `aider`).
+     * **Adapter B (Direct APIs & Local Ollama)**: Direct HTTP client to OpenAI-compatible, DeepSeek, Anthropic, or local Ollama (`http://127.0.0.1:11434`) endpoints with zero external dependencies.
+     * **Adapter C (Zero-API In-IDE Subagents & Personas)**: $0 cost, zero keys required. Operates directly in Antigravity.
+   * **Fail-Safe Cascade Guarantee**: If an API server is down, hits rate limits, or a CLI is missing, `fleet_dispatch.py` catches the error, logs the diagnostic trail, and cascades down to the fallback subagent without breaking the pipeline.
 
 ## Phase 1 & 1.5: Zero-Presumption Spec & Visual Approval Gate
 

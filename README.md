@@ -1,13 +1,13 @@
 # 🦅 Multi-Agent Collaborative Audit (MACA)
 
-> **Spec-Driven, Ponytail-Optimized, Fleet-Delegated & Sequential E2E Intent-Verified Multi-Agent Engineering Skill.**
+> **Spec-Driven, Ponytail-Optimized, Dynamic Fleet-Routed & Sequential E2E Intent-Verified Multi-Agent Engineering Skill.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Orchestrator: Antigravity](https://img.shields.io/badge/Orchestrator-Antigravity-4285F4.svg)](https://deepmind.google)
 [![Architecture: Spec--Driven](https://img.shields.io/badge/Architecture-SDD-green.svg)](#-the-5-phase-sdd-workflow)
 [![Minimalism: Ponytail Engine](https://img.shields.io/badge/Philosophy-Ponytail--Minimalism-ff69b4.svg)](#-the-7-rung-ponytail-minimalism-engine)
 [![Verification: 3--Layer E2E Oracle](https://img.shields.io/badge/Verification-Sequential--E2E--Oracle-10b981.svg)](#-phase-4-dedicated-sequential-e2e--call-chain-verification-zone)
-[![Fleet: Multi--Model](https://img.shields.io/badge/Fleet-Claude%20%7C%20OpenCode%20%7C%20Codex%20%7C%20Gemini-orange.svg)](#-fleet-architecture--lane-routing)
+[![Fleet: Dynamic Multi--Adapter](https://img.shields.io/badge/Fleet-CLIs%20%7C%20APIs%20%7C%20Ollama%20%7C%20Zero--API-blueviolet.svg)](#-dynamic-multi-adapter-fleet-router--zero-api-resilience)
 
 ---
 
@@ -18,15 +18,15 @@ Modern AI-assisted software engineering suffers from **four fatal failure modes*
 1. **Agent Bloat & Overengineering**: LLMs generate speculative abstractions, inject unneeded dependencies, or compress multi-step logic into brittle one-liners.
 2. **Infinite or Fake Review Loops**: Multi-agent setups either loop indefinitely in circular debates or fake independent review using single-turn `[In-Process]` self-approvals.
 3. **The Bulk-Mock & Vacuous Test Illusion**: Tests pass with green `exit code 0` because tests feed pre-baked mock payloads directly into state instead of stepping through real time sequences ($T_0 \to T_1 \to T_2$). The app passes tests, but fails when a human clicks it.
-4. **Environment Fragility & Delusion**: Agents assume external CLIs exist, crashing or hallucinating commands when running sandboxed.
+4. **Environment Fragility & Delusion**: Agents assume external CLIs or specific API keys exist, crashing or halting when running sandboxed or offline.
 
-**Multi-Agent Collaborative Audit (MACA)** resolves these failure modes deterministically. Led by **Google Antigravity** as the Principal Consultant, MACA enforces a **5-Phase Spec-Driven Workflow**, passes all code through a **7-Rung Ponytail Minimalism Ladder**, bounds adversarial reviews to **2 rounds maximum**, and gates all releases through a **Dedicated Sequential E2E & 3-Layer Outcome Oracle Zone**.
+**Multi-Agent Collaborative Audit (MACA)** resolves these failure modes deterministically. Led by **Google Antigravity** as the Principal Consultant, MACA enforces a **5-Phase Spec-Driven Workflow**, passes all code through a **7-Rung Ponytail Minimalism Ladder**, bounds adversarial reviews to **2 rounds maximum**, and routes execution through a **Dynamic, Model-Agnostic Multi-Adapter Fleet Router** with automated fail-safe cascade.
 
 ---
 
-## 🏛️ Fleet Architecture & Lane Routing
+## 🏛️ Model-Agnostic Fleet Architecture & Lane Contracts
 
-MACA decouples software delivery into specialized, isolated **Fleet Lanes**. Each lane operates with strict boundaries and zero presumption of correctness from prior steps.
+MACA decouples software delivery into specialized, isolated **Fleet Lanes**. Rather than hardcoding rigid models, each lane is defined by a **Functional Competency Contract** that can be powered by your choice of local CLIs, direct APIs, local LLMs (Ollama), or native zero-cost In-IDE subagents.
 
 ```mermaid
 flowchart TD
@@ -40,12 +40,12 @@ flowchart TD
 
     Boot --> Spec --> MockGate --> Plan
 
-    subgraph FleetLanes["⚡ Specialized Fleet Execution Lanes"]
+    subgraph DynamicRouter["⚡ Dynamic Multi-Adapter Fleet Router (scripts/fleet_dispatch.py)"]
         direction TB
-        UI["🎨 UI/UX & Graphic Mocking Lane<br/>Claude 3.5 Sonnet (claude-delegate)<br/>• Interactive HTML/SVG Prototypes<br/>• WCAG 2.1 AA a11y & Visual State"]
-        Logic["🧠 Core Logic Lane<br/>OpenCode DeepSeek / Codex (opencode/codex-delegate)<br/>• Business Algorithms & State Machines<br/>• Concurrency & Query Optimization"]
-        Data["📊 Data Lane<br/>OpenCode GLM / GPT-4o (opencode-delegate)<br/>• Schema Migrations & DTOs<br/>• Strict Boundary Validation"]
-        Audit["🛡️ QA & Audit Referee Lane<br/>Gemini 1.5 Pro / Flash (agy-delegate / gemini)<br/>• Rule 6 Tabula Rasa Diff Audit<br/>• Sequential E2E Oracle Verification"]
+        UI["🎨 UI/UX Mocking Lane<br/><b>Visual Design Contract</b><br/>• Interactive HTML/SVG Prototypes<br/>• WCAG 2.1 AA a11y & Visual State"]
+        Logic["🧠 Core Logic Lane<br/><b>Algorithmic & State Contract</b><br/>• Business Algorithms & State Machines<br/>• Concurrency & Query Optimization"]
+        Data["📊 Data Lane<br/><b>Data Integrity Contract</b><br/>• Schema Migrations & DTOs<br/>• Strict Boundary Validation"]
+        Audit["🛡️ QA & Audit Referee Lane<br/><b>Adversarial Audit Contract</b><br/>• Rule 6 Tabula Rasa Diff Audit<br/>• Sequential E2E Oracle Verification"]
     end
 
     Plan --> UI
@@ -57,15 +57,112 @@ flowchart TD
     Audit --> Arbiter
 ```
 
-### Fleet Specialization Matrix
+### Lane Competency Contracts
 
-| Lane | Default Engine / Model | Primary Deliverables | Strict Boundary |
+| Lane | Competency Contract & Deliverables | Supported Providers (Fully Dynamic) | Strict Boundary |
 | :--- | :--- | :--- | :--- |
-| **Lead Orchestrator** | **Google Antigravity** | Master plan, preflight, referee rulings, git commits | Supreme Arbiter; breaks ties after Round 2 |
-| **🎨 UI/UX Mocking** | **Claude 3.5 Sonnet** | `.agents/mocks/*.html`, vector SVGs, a11y audit | **Visual Gate**: Zero logic coding until user approves mock |
-| **🧠 Core Logic** | **OpenCode (DeepSeek/Codex)** | Domain models, algorithms, state engines | Adheres to Ponytail Rungs 1–3 before introducing abstractions |
-| **📊 Data** | **OpenCode (GLM/GPT-4o)** | Migrations, DTOs, boundary parsers, schemas | Type-safe null safety; strict external input sanitization |
-| **🛡️ QA & Referee** | **Gemini (Pro / Flash)** | Diff audits, call-chain tracing, E2E oracle runs | **Rule 6 Tabula Rasa**: Independent critique; no assumptions |
+| **Lead Orchestrator** | Master task charter, preflight verification, arbiter rulings, commit authority | Google Antigravity | Supreme Arbiter; breaks ties after Round 2 |
+| **🎨 UI/UX Mocking** | Interactive HTML/SVG prototypes (`.agents/mocks/*.html`), vector rendering, responsive layout, a11y audit | Claude Code CLI, Vision APIs, or In-IDE Subagent | **Visual Gate**: Zero logic coding until user approves mock |
+| **🧠 Core Logic** | Domain models, algorithms, state engines, mathematical invariants | OpenCode, Codex CLI, Reasoning APIs, or In-IDE Subagent | Adheres to Ponytail Rungs 1–3 before introducing abstractions |
+| **📊 Data** | Migrations, DTOs, boundary parsers, schemas, database persistence | OpenCode, Codex CLI, Schema APIs, or In-IDE Subagent | Type-safe null safety; strict external input sanitization |
+| **🛡️ QA & Referee** | Adversarial diff reviews, call-chain tracing, sequential E2E oracle runs | Gemini CLI, Deep-Context APIs, or In-IDE Subagent | **Rule 6 Tabula Rasa**: Independent critique; no assumptions |
+
+---
+
+## 🔌 Dynamic Multi-Adapter Fleet Router & Zero-API Resilience
+
+MACA's Fleet Dispatcher ([`scripts/fleet_dispatch.py`](scripts/fleet_dispatch.py)) lets each user configure their own fleet in [`.agents/fleet.json`](resources/templates/fleet.template.json) without depending on specific vendors, paid subscriptions, or proprietary APIs.
+
+```mermaid
+flowchart TD
+    Dispatch["Lane Task Dispatched"] --> PrimaryCheck{"Attempt Primary<br/>Configured Adapter"}
+    
+    PrimaryCheck -->|Success| Success["✅ Lane Task Complete"]
+    
+    PrimaryCheck -->|Unreachable Server / 5xx / Rate Limit / Missing CLI| FailHandler["⚠️ Catch Error & Log Diagnostic Event<br/>(Record primary failure without crashing)"]
+    
+    FailHandler --> CascadeCheck{"Check Fallback Adapter<br/>in .agents/fleet.json"}
+    
+    CascadeCheck -->|Configured Fallback| FallbackRun["🔄 Execute Fallback Adapter<br/>(CLI -> Subagent -> Persona)"]
+    
+    FallbackRun -->|Success| FallbackSuccess["✅ Task Rescued via Fallback<br/>(Pipeline Continues Unbroken)"]
+    FallbackRun -->|Exhausted| SafeHalt["🛑 Controlled Diagnostic Halt<br/>(Actionable Remediation Guidance)"]
+```
+
+### 1. The 4 Universal Execution Adapters
+
+1. **`zero-api` In-IDE Subagents ($0 Cost, Zero Keys)**:
+   * **For users who do not have external API keys or paid CLI subscriptions**:
+   * Uses native In-IDE subagents or Single-Model Tabula Rasa context-reset personas.
+   * Completely self-contained, operates within your active IDE session, and costs nothing.
+2. **`cli` Local Agentic CLIs**:
+   * Spawns pre-installed AI CLIs (`claude`, `opencode`, `codex`, `agy`, `cursor`, `aider`, `goose`).
+   * Inherits your existing terminal authentication, local credentials, and default model setups.
+3. **`api` Direct HTTP Endpoints (OpenAI-Compatible & Custom)**:
+   * Native HTTP client using Python's standard library (`urllib.request`) — zero npm/pip dependencies.
+   * Works with OpenAI, DeepSeek API, Anthropic API, Google GenAI API, OpenRouter, or **free local LLMs** running via **Ollama** (`http://127.0.0.1:11434`) or **vLLM**.
+4. **`script` Custom Executable Wrappers**:
+   * Executes arbitrary custom agent scripts or binaries (`./scripts/my_agent.sh`).
+
+### 2. Declarative Fleet Manifest (`.agents/fleet.json`)
+
+To customize your fleet, create `.agents/fleet.json` (or generate one with `python3 scripts/fleet_dispatch.py --init-config`):
+
+```json
+{
+  "lanes": {
+    "ui_ux": {
+      "primary": { "adapter": "cli", "binary": "claude", "model": "claude-3-7-sonnet" },
+      "fallback": { "adapter": "subagent", "role_name": "UI/UX Designer" }
+    },
+    "core_logic": {
+      "primary": {
+        "adapter": "api",
+        "protocol": "openai-compatible",
+        "endpoint": "https://api.deepseek.com/v1/chat/completions",
+        "api_key_env": "DEEPSEEK_API_KEY",
+        "model": "deepseek-reasoner"
+      },
+      "fallback": { "adapter": "subagent", "role_name": "Core Logic Engineer" }
+    },
+    "data": {
+      "primary": { "adapter": "cli", "binary": "codex" },
+      "fallback": { "adapter": "subagent", "role_name": "Data Architect" }
+    },
+    "qa_referee": {
+      "primary": { "adapter": "subagent", "role_name": "QA Referee" },
+      "fallback": { "adapter": "subagent", "role_name": "Emergency Auditor" }
+    }
+  }
+}
+```
+
+### 3. Unreachable Server & Fail-Safe Cascade
+
+* **Automatic Timeout & Network Protection**: Direct API requests have strict configurable timeouts (default 30s).
+* **Fault-Tolerant Cascade**: If a remote API server goes down, returns `HTTP 500/503`, hits rate limits (`HTTP 429`), or an external CLI is uninstalled:
+  1. The error is captured gracefully without crashing the turn.
+  2. The failure cause is documented in the audit log.
+  3. The dispatcher immediately cascades to the designated fallback (such as the In-IDE subagent).
+* **Pipeline Continuity**: Work never halts due to transient network failures or missing API credits.
+
+### 4. Built-in Detection, Self-Repair & Resilience Testing
+
+The fleet engine includes a comprehensive test and repair suite:
+
+```bash
+# Run comprehensive resilience and fallback self-tests
+python3 scripts/fleet_dispatch.py --self-test
+
+# Detect available local CLIs and environment API keys
+python3 scripts/fleet_dispatch.py --detect-only
+
+# Initialize a tailored .agents/fleet.json for current workspace
+python3 scripts/fleet_dispatch.py --init-config
+
+# Validate and automatically repair missing keys or schema errors
+python3 scripts/fleet_dispatch.py --validate .agents/fleet.json
+```
 
 ---
 
@@ -89,7 +186,7 @@ flowchart LR
 ```
 Phase 0: Engine Bootstrap & First-Run Deep Diagnostic
   ├── Run scripts/first_run_preflight.py & scripts/bootstrap.sh
-  ├── Verify all 11 external tools (Claude, OpenCode, Codex, Gemini, Playwright, E2E, Maestro)
+  ├── Verify all 11 external tools and execution engines
   └── Fail-Closed Error Reporting: Never proceed silently with broken tooling
 
 Phase 1: Zero-Presumption Spec & Call-Chain Architecture
@@ -254,47 +351,6 @@ Track project metrics in real time with [`scripts/measure_metrics.py`](scripts/m
 ./scripts/measure_metrics.py --self-test
 ```
 
-### Key Metrics Monitored
-
-* **Overall Efficacy Score (0–100 & Letter Grade)**: Synthesized from simplicity, test pass rate, and review cycle speed.
-* **Ponytail Simplicity Index**: Percentage of architectural solutions resolved in Rungs 1–3 vs Rungs 6–7.
-* **First-Turn Pass Rate**: Percentage of code patches approved in Round 1 without rework.
-* **Arbiter Escalation Count**: Number of cross-lane disputes escalated to the Antigravity Supreme Arbiter.
-* **Git Evidence & Provenance Trail**: Live table displaying commit SHAs, author lanes, verified scopes, and Ponytail debt tags.
-
----
-
-## 🎛️ Tooling Inventory & Multi-Tier Scarcity Cascade
-
-MACA dynamically adapts to your local machine using a **3-Tier Scarcity Cascade**:
-
-```mermaid
-flowchart TD
-    Start["Task Initiated"] --> T1Check{"Are External Fleet CLIs<br/>installed in PATH?"}
-    
-    T1Check -->|Yes| Tier1["Tier 1: Full External Fleet<br/>• Claude Code CLI (@anthropic-ai/claude-code)<br/>• OpenCode CLI (opencode)<br/>• Codex CLI (codex)<br/>• Gemini CLI (@google/gemini-cli)<br/>• E2E Runner (e2e)<br/>• Mobile Runner (maestro)"]
-    
-    T1Check -->|No| T2Check{"Are Subagents / MCP<br/>available in IDE?"}
-    
-    T2Check -->|Yes| Tier2["Tier 2: IDE Subagents & MCP<br/>• Delegate via Antigravity Subagents<br/>• Execute tools via local MCP servers"]
-    
-    T2Check -->|No| Tier3["Tier 3: Single-Model Tabula Rasa<br/>• Antigravity resets context per turn<br/>• Simulates isolated adversarial personas<br/>• Strictly enforces max 2 review rounds"]
-```
-
-### Complete Tooling Matrix
-
-| Tool | Category | Installation Command | Purpose |
-| :--- | :--- | :--- | :--- |
-| **`claude`** | AI Fleet CLI | `npm install -g @anthropic-ai/claude-code` | Claude 3.5 Sonnet UI/UX Mocking Lane |
-| **`opencode`** | AI Fleet CLI | `brew install opencode` | Core Logic (DeepSeek) & Data (GLM) Lane |
-| **`codex`** | AI Fleet CLI | `brew install codex` | Algorithmic logic & optimization |
-| **`gemini`** | AI Fleet CLI | `npm install -g @google/gemini-cli` | Full-repo review & QA fallback lane |
-| **`agy`** | AI Fleet CLI | `brew install agy` | Native Antigravity CLI delegation |
-| **`e2e`** | E2E Engine | `npm install -g e2e` | Hybrid AI + Deterministic E2E testing |
-| **`maestro`** | Mobile E2E | `curl -Ls 'https://get.maestro.mobile.dev' \| bash` | Mobile UI declarative flow automation |
-| **`playwright`**| Web E2E | `npm install -g playwright` | Headless browser execution & DOM capture |
-| **`adb`** | Mobile Device| Android Platform-Tools | Android emulator & physical device bridge |
-
 ---
 
 ## 🚀 Quickstart
@@ -302,20 +358,29 @@ flowchart TD
 ### 1. Verify Environment & Preflight
 Run the one-time deep diagnostic and preflight check:
 ```bash
-# Run first-run preflight
+# Run first-run preflight (validates all internal scripts & tools)
 python3 scripts/first_run_preflight.py
 
 # Verify bootstrap readiness
 ./scripts/bootstrap.sh
 ```
 
-### 2. Initialize a Task in Your Workspace
+### 2. Configure or Auto-Detect Fleet
+```bash
+# Detect local tools (CLIs, API keys, Zero-API readiness)
+python3 scripts/fleet_dispatch.py --detect-only
+
+# Initialize tailored fleet manifest in your workspace
+python3 scripts/fleet_dispatch.py --init-config
+```
+
+### 3. Initialize a Task in Your Workspace
 To audit an existing project or initialize a new feature with the Skill Ambassador:
 ```bash
 python3 scripts/skill_ambassador_auditor.py --init-log /path/to/project --feature "FeatureName"
 ```
 
-### 3. Verify Code with the E2E Scenario Engine
+### 4. Verify Code with the E2E Scenario Engine
 ```bash
 # Run scenario & call-chain verification suite
 python3 scripts/scenario_and_callchain_engine.py --self-test

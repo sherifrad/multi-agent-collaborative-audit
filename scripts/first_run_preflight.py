@@ -39,6 +39,7 @@ REQUIRED_INTERNAL_FILES = [
     "scripts/measure_metrics.py",
     "scripts/scenario_and_callchain_engine.py",
     "scripts/skill_ambassador_auditor.py",
+    "scripts/fleet_dispatch.py",
     "references/e2e_and_call_chain_testing.py" if False else "references/e2e_and_call_chain_testing.md",
     "references/ponytail_ladder.md",
     "references/domain_packs.md",
@@ -51,6 +52,7 @@ REQUIRED_INTERNAL_FILES = [
     "resources/templates/SPEC_AND_AUDIT.template.md",
     "resources/templates/MACA_TOURNAMENT_LEADERBOARD.template.md",
     "resources/templates/SKILL_COMPLIANCE_LOG.template.md",
+    "resources/templates/fleet.template.json",
     "vendor/delegate-skills/skills/shared_relay.mjs",
     "vendor/delegate-skills/skills/codex-delegate/SKILL.md",
     "vendor/delegate-skills/skills/codex-delegate/scripts/relay.mjs",
@@ -152,6 +154,8 @@ def compute_skill_fingerprint() -> str:
         SCRIPT_DIR / "measure_metrics.py",
         SCRIPT_DIR / "scenario_and_callchain_engine.py",
         SCRIPT_DIR / "skill_ambassador_auditor.py",
+        SCRIPT_DIR / "fleet_dispatch.py",
+        SKILL_ROOT / "resources/templates/fleet.template.json",
         SKILL_ROOT / "vendor/delegate-skills/skills/shared_relay.mjs"
     ]
     for p in watched:
@@ -181,6 +185,7 @@ def run_internal_script_selftests() -> List[Dict[str, Any]]:
         ("measure_metrics.py", [sys.executable, str(SCRIPT_DIR / "measure_metrics.py"), "--self-test"]),
         ("scenario_and_callchain_engine.py", [sys.executable, str(SCRIPT_DIR / "scenario_and_callchain_engine.py"), "--self-test"]),
         ("skill_ambassador_auditor.py", [sys.executable, str(SCRIPT_DIR / "skill_ambassador_auditor.py"), "--self-test"]),
+        ("fleet_dispatch.py", [sys.executable, str(SCRIPT_DIR / "fleet_dispatch.py"), "--self-test"]),
     ]
     for name, cmd in py_scripts:
         proc = subprocess.run(cmd, env=env, capture_output=True, text=True)
