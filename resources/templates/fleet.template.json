@@ -59,7 +59,7 @@
       "primary": {
         "adapter": "cli",
         "binary": "gemini",
-        "args": ["run", "--audit", "{brief}"]
+        "args": ["-p", "{brief}"]
       },
       "fallback": {
         "adapter": "subagent",
