@@ -1,300 +1,330 @@
 # 🦅 Multi-Agent Collaborative Audit (MACA)
 
-> **Spec-Driven, Ponytail-Optimized, and Fleet-Delegated Multi-Agent Engineering & Audit Skill for AI Orchestrators.**
+> **Spec-Driven, Ponytail-Optimized, Fleet-Delegated & Sequential E2E Intent-Verified Multi-Agent Engineering Skill.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Orchestrator: Antigravity](https://img.shields.io/badge/Orchestrator-Antigravity-4285F4.svg)](https://deepmind.google)
-[![Architecture: Spec--Driven](https://img.shields.io/badge/Architecture-SDD-green.svg)](#the-5-phase-sdd-workflow)
-[![Minimalism: Ponytail Engine](https://img.shields.io/badge/Philosophy-Ponytail--Minimalism-ff69b4.svg)](#-the-ponytail-minimalism-engine)
-[![Delegation: Delegate--Skills](https://img.shields.io/badge/Engine-Delegate--Skills-orange.svg)](#-affiliations--philosophical-lineage)
+[![Architecture: Spec--Driven](https://img.shields.io/badge/Architecture-SDD-green.svg)](#-the-5-phase-sdd-workflow)
+[![Minimalism: Ponytail Engine](https://img.shields.io/badge/Philosophy-Ponytail--Minimalism-ff69b4.svg)](#-the-7-rung-ponytail-minimalism-engine)
+[![Verification: 3--Layer E2E Oracle](https://img.shields.io/badge/Verification-Sequential--E2E--Oracle-10b981.svg)](#-phase-4-dedicated-sequential-e2e--call-chain-verification-zone)
+[![Fleet: Multi--Model](https://img.shields.io/badge/Fleet-Claude%20%7C%20OpenCode%20%7C%20Codex%20%7C%20Gemini-orange.svg)](#-fleet-architecture--lane-routing)
 
 ---
 
 ## 🎯 Overview & Mission
 
-Modern AI-assisted engineering often suffers from **three fatal failure modes**:
-1. **Agent Bloat & Overengineering**: LLMs write speculative abstractions, introduce unnecessary third-party packages, or compress logic into unreadable "clever" one-liners.
-2. **Infinite Review Loops**: Multi-agent critique loops spin out of control with circular disagreements and mutual finger-pointing.
-3. **Environment Fragility & Delusion**: Agents assume external proprietary CLIs are always available, hallucinating tools or crashing when sandboxed.
+Modern AI-assisted software engineering suffers from **four fatal failure modes**:
 
-**Multi-Agent Collaborative Audit (MACA)** is a production-grade orchestration skill led by **Antigravity** as the Principal Consultant. It partitions software engineering and auditing into distinct, specialized **Fleet Lanes**, drives execution through a **7-Rung Minimalism Ladder (Ponytail Engine)**, bounds peer critiques to **2 rounds maximum**, and provides a **3-Tier Scarcity Cascade** ensuring continuous execution in any development environment.
+1. **Agent Bloat & Overengineering**: LLMs generate speculative abstractions, inject unneeded dependencies, or compress multi-step logic into brittle one-liners.
+2. **Infinite or Fake Review Loops**: Multi-agent setups either loop indefinitely in circular debates or fake independent review using single-turn `[In-Process]` self-approvals.
+3. **The Bulk-Mock & Vacuous Test Illusion**: Tests pass with green `exit code 0` because tests feed pre-baked mock payloads directly into state instead of stepping through real time sequences ($T_0 \to T_1 \to T_2$). The app passes tests, but fails when a human clicks it.
+4. **Environment Fragility & Delusion**: Agents assume external CLIs exist, crashing or hallucinating commands when running sandboxed.
+
+**Multi-Agent Collaborative Audit (MACA)** resolves these failure modes deterministically. Led by **Google Antigravity** as the Principal Consultant, MACA enforces a **5-Phase Spec-Driven Workflow**, passes all code through a **7-Rung Ponytail Minimalism Ladder**, bounds adversarial reviews to **2 rounds maximum**, and gates all releases through a **Dedicated Sequential E2E & 3-Layer Outcome Oracle Zone**.
 
 ---
 
 ## 🏛️ Fleet Architecture & Lane Routing
 
+MACA decouples software delivery into specialized, isolated **Fleet Lanes**. Each lane operates with strict boundaries and zero presumption of correctness from prior steps.
+
 ```mermaid
 flowchart TD
-    subgraph Orchestrator["🦅 Principal Consultant & Fleet Orchestrator (Antigravity)"]
+    subgraph Lead["🦅 Principal Consultant & Fleet Orchestrator (Antigravity)"]
         Boot["Phase 0: Engine Bootstrap & Fleet Discovery"]
-        Spec["Phase 1: Zero-Presumption Spec & Audit"]
-        MockGate["Phase 1.5: UI/UX Mocking & Visual Gate<br/><i>(User Approval Inviolable)</i>"]
+        Spec["Phase 1: Zero-Presumption Spec & Call-Chain Map"]
+        MockGate["Phase 1.5: UI/UX Visual Approval Gate<br/>User Approval Inviolable"]
         Plan["Phase 2: Task Partitioning & Lane Allocation"]
         Arbiter["Supreme Arbiter & Final Commit Authority"]
     end
 
     Boot --> Spec --> MockGate --> Plan
 
-    subgraph FleetLanes["⚡ Specialized Fleet Lanes"]
+    subgraph FleetLanes["⚡ Specialized Fleet Execution Lanes"]
         direction TB
-        UI["🎨 UI/UX & Graphic Design Lane<br/><b>Claude 3.5 Sonnet (Default)</b><br/>• Layouts, Mockups & SVGs<br/>• WCAG 2.1 AA a11y<br/>• User-Approved Prototypes"]
-        Logic["🧠 Core Logic Lane<br/><b>OpenCode DeepSeek / Codex</b><br/>• Business Algorithms<br/>• Concurrency & Threads<br/>• Query & State Optimization"]
-        Data["📊 Data Lane<br/><b>OpenCode GLM / GPT-4o</b><br/>• Schema Migrations<br/>• DTOs & Serialization<br/>• Input Boundary Validation"]
-        Audit["🛡️ QA & Audit Lane<br/><b>Gemini 1.5 Pro / Flash</b><br/>• Full-Repo Synthesis<br/>• Threat Modeling (OWASP)<br/>• Regulatory Domain Verification"]
+        UI["🎨 UI/UX & Graphic Mocking Lane<br/>Claude 3.5 Sonnet (claude-delegate)<br/>• Interactive HTML/SVG Prototypes<br/>• WCAG 2.1 AA a11y & Visual State"]
+        Logic["🧠 Core Logic Lane<br/>OpenCode DeepSeek / Codex (opencode/codex-delegate)<br/>• Business Algorithms & State Machines<br/>• Concurrency & Query Optimization"]
+        Data["📊 Data Lane<br/>OpenCode GLM / GPT-4o (opencode-delegate)<br/>• Schema Migrations & DTOs<br/>• Strict Boundary Validation"]
+        Audit["🛡️ QA & Audit Referee Lane<br/>Gemini 1.5 Pro / Flash (agy-delegate / gemini)<br/>• Rule 6 Tabula Rasa Diff Audit<br/>• Sequential E2E Oracle Verification"]
     end
 
-    MockGate -.->|"Presents Standalone Mock"| UI
     Plan --> UI
     Plan --> Logic
     Plan --> Data
-    Plan --> Audit
-
-    UI <-->|"Turn Sync & Peer Review"| Logic
-    Logic <-->|"Schema & State Validation"| Data
-    Data <-->|"Integrity & Stress Audit"| Audit
-
-    UI -.->|"Dispute Escalation (Round 2)"| Arbiter
-    Logic -.->|"Dispute Escalation (Round 2)"| Arbiter
-    Data -.->|"Dispute Escalation (Round 2)"| Arbiter
-    Audit -.->|"Dispute Escalation (Round 2)"| Arbiter
-
-    Arbiter --> Verify["Phase 4 & 5: Platform Stress Testing & Final Commit"]
-
-    style Orchestrator fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
-    style MockGate fill:#f59e0b,stroke:#fbbf24,stroke-width:2px,color:#000
-    style FleetLanes fill:#0f172a,stroke:#64748b,stroke-width:1px,color:#f8fafc
-    style Arbiter fill:#e11d48,stroke:#fda4af,stroke-width:2px,color:#fff
+    UI --> Audit
+    Logic --> Audit
+    Data --> Audit
+    Audit --> Arbiter
 ```
+
+### Fleet Specialization Matrix
+
+| Lane | Default Engine / Model | Primary Deliverables | Strict Boundary |
+| :--- | :--- | :--- | :--- |
+| **Lead Orchestrator** | **Google Antigravity** | Master plan, preflight, referee rulings, git commits | Supreme Arbiter; breaks ties after Round 2 |
+| **🎨 UI/UX Mocking** | **Claude 3.5 Sonnet** | `.agents/mocks/*.html`, vector SVGs, a11y audit | **Visual Gate**: Zero logic coding until user approves mock |
+| **🧠 Core Logic** | **OpenCode (DeepSeek/Codex)** | Domain models, algorithms, state engines | Adheres to Ponytail Rungs 1–3 before introducing abstractions |
+| **📊 Data** | **OpenCode (GLM/GPT-4o)** | Migrations, DTOs, boundary parsers, schemas | Type-safe null safety; strict external input sanitization |
+| **🛡️ QA & Referee** | **Gemini (Pro / Flash)** | Diff audits, call-chain tracing, E2E oracle runs | **Rule 6 Tabula Rasa**: Independent critique; no assumptions |
 
 ---
 
-## 🪢 The Ponytail Minimalism Engine
+## 🔄 The 5-Phase SDD Engineering Workflow
 
-The **Ponytail Minimalism Engine** enforces a strict, hierarchical decision ladder. When implementing or reviewing code, every agent must evaluate options from **Rung 1** upward, ascending only when mathematically or functionally necessary:
+Every non-trivial engineering task strictly advances through five sequential gates:
 
 ```mermaid
 flowchart LR
-    R1["<b>Rung 1</b><br/>YAGNI<br/><i>Cut speculative code</i>"] -->
-    R2["<b>Rung 2</b><br/>Existing Helper<br/><i>Reuse repo utils</i>"] -->
-    R3["<b>Rung 3</b><br/>Standard Library<br/><i>Language primitives</i>"] -->
-    R4["<b>Rung 4</b><br/>Platform / OS API<br/><i>Native web/mobile APIs</i>"] -->
-    R5["<b>Rung 5</b><br/>Installed Dep<br/><i>Existing package.json</i>"] -->
-    R6["<b>Rung 6</b><br/>Atomic Primitive<br/><i>Clean readable function</i>"] -->
-    R7["<b>Rung 7</b><br/>Custom High-Perf<br/><i>Bespoke optimization</i>"]
-
-    style R1 fill:#22c55e,color:#000
-    style R2 fill:#4ade80,color:#000
-    style R3 fill:#a3e635,color:#000
-    style R4 fill:#facc15,color:#000
-    style R5 fill:#fb923c,color:#000
-    style R6 fill:#f87171,color:#000
-    style R7 fill:#ef4444,color:#fff
+    P0["Phase 0<br/>Bootstrap & Diagnostics"] --> P1["Phase 1<br/>Spec & Call-Chain Map"]
+    P1 --> P15["Phase 1.5<br/>Visual Mock Gate<br/>(User Signs Off)"]
+    P15 --> P2["Phase 2<br/>Task Queue Sync"]
+    P2 --> P3["Phase 3<br/>Tabula Rasa Diff Audit"]
+    P3 --> P4["Phase 4<br/>Sequential E2E Zone"]
+    P4 --> P45["Phase 4.5<br/>Deep Diagnostics"]
+    P45 --> Final["Phase 5<br/>Telemetry & Release"]
 ```
 
-### 🛑 Inviolable Guardrails: Minimalism $\neq$ Sloppiness
-Under no circumstances may an agent skip or weaken:
-1. **Input validation & schema integrity** (nullability, bounds, type safety).
-2. **Defensive error handling** (no swallowed exceptions or silent failures).
-3. **Security barriers** (CSRF, sanitization, least-privilege auth).
-4. **Accessibility (a11y)** (screen readers, semantics, contrast).
-5. **Domain/Clinical precision** (dosages, financial decimals, unit conversions).
+### Detailed Gate Breakdown
+
+```
+Phase 0: Engine Bootstrap & First-Run Deep Diagnostic
+  ├── Run scripts/first_run_preflight.py & scripts/bootstrap.sh
+  ├── Verify all 11 external tools (Claude, OpenCode, Codex, Gemini, Playwright, E2E, Maestro)
+  └── Fail-Closed Error Reporting: Never proceed silently with broken tooling
+
+Phase 1: Zero-Presumption Spec & Call-Chain Architecture
+  ├── Author .agents/SPEC_AND_AUDIT.md
+  ├── Map upstream and downstream call chains: (F_upstream -> F_target -> F_downstream)
+  └── Pin failure modes, boundaries, and acceptance criteria
+
+Phase 1.5: Inviolable UI/UX Visual Approval Gate (Mandatory for User-Facing UI)
+  ├── UI/UX Lane produces self-contained interactive prototype (.agents/mocks/<feature>.html)
+  ├── Embed high-fidelity SVGs, real color tokens, and responsive mobile/desktop containers
+  └── 🛑 HARD STOP: Present prototype to User. Zero logic coding allowed until User approves!
+
+Phase 2: Task Partitioning & Queue Synchronization
+  ├── Synchronize tasks/current_task.md or .agents/PLAN_TASKS.md
+  └── Partition work into independent, non-overlapping atomic subtasks
+
+Phase 3: Tabula Rasa Adversarial Diff Audit (Rule 6)
+  ├── QA Lane inspects `git diff` with clean slate (Zero prior knowledge or model bias)
+  ├── Document findings in .agents/AI_HANDOFF_LEDGER.md (Banning fake `[In-Process]` badges)
+  └── Maximum 2 debate rounds; Antigravity Arbiter rules deterministically on unresolved disputes
+
+Phase 4: Dedicated Sequential E2E & 3-Layer Outcome Oracle Zone
+  ├── Execute scripts/scenario_and_callchain_engine.py
+  ├── Enforce Anti-Bulk-Mock Progression (T0 -> T1 -> T2 chronological events)
+  └── Verify 3-Layer Oracle: Domain Logic + DB Persistence + UI Assertion + Negative Control
+
+Phase 4.5: Deep Diagnostics & Performance Profiling
+  ├── Inspect Logcat, memory heap, crashlytics, and system traces
+  └── Require explicit User Consent before running heavy instrumentation
+
+Phase 5: Telemetry, Desktop Notification & Final Commit
+  ├── Calculate project health and Ponytail index (scripts/measure_metrics.py)
+  ├── Send native macOS notification (--notify)
+  └── Produce atomic git commit with full Fleet Dispatch attribution badge
+```
 
 ---
 
-## 🔄 The 5-Phase SDD Workflow
+## 🧪 Phase 4: Dedicated Sequential E2E & Call-Chain Verification Zone
+
+To bridge the gap between "green tests" and broken software, MACA bans vacuous tests and bulk mocks through [`references/e2e_and_call_chain_testing.md`](references/e2e_and_call_chain_testing.md) and [`scripts/scenario_and_callchain_engine.py`](scripts/scenario_and_callchain_engine.py).
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Dev as Developer / User
-    participant Orch as 🦅 Antigravity Orchestrator
-    participant UILane as 🎨 UI/UX Lane (Claude Default)
-    participant Lanes as 👥 Fleet Lanes (Logic / Data)
-    participant QA as 🛡️ QA & Audit Lane
-    participant Ledger as 📜 Governance Ledger (.agents/)
+    actor User as Real User / E2E Runner
+    participant UI as Presentation Layer
+    participant Upstream as Upstream Caller (F_upstream)
+    participant Target as Target Business Logic (F_target)
+    participant Downstream as Downstream Consumer (F_downstream)
+    participant Storage as Real DB / State Store
 
-    Dev->>Orch: Submit Feature / Audit Request
-    Note over Orch: Phase 0: Non-blocking bootstrap (bootstrap.sh)
-    Orch->>Ledger: Generate AGENTS.md & AI_HANDOFF_LEDGER.md
-    Note over Orch: Phase 1: Zero-Presumption Audit
-    Orch->>Ledger: Formulate SPEC_AND_AUDIT.md
+    Note over User,Storage: Anti-Bulk-Mock Progression: Step-by-Step Chronological Events (T0 -> T1 -> T2)
+    User->>UI: T0: User opens screen (Initial Empty State)
+    UI->>Target: Fetch baseline state
+    Target->>Storage: Read real record
+    Storage-->>Target: Empty / Initial Data
+    Target-->>UI: Render baseline UI
 
-    rect rgb(45, 30, 60)
-        Note over Orch,UILane: Phase 1.5: UI/UX & Graphic Mocking (Visual Gate)
-        Orch->>UILane: Request Standalone Mockup (HTML/CSS/SVG)
-        UILane->>Dev: Present Interactive Mockup & File Path
-        Dev-->>Orch: Review & Sign-Off (APPROVED)
+    User->>UI: T1: User submits step 1 (Partial Entry)
+    UI->>Upstream: Trigger primary action
+    Upstream->>Target: Call Target Function with input
+    Target->>Storage: Mutate state (DB Layer)
+    Target->>Downstream: Fire downstream side-effect
+
+    User->>UI: T2: User finalizes action (Terminal State)
+    UI->>Target: Validate completion
+    Target->>Storage: Persist final transaction
+    
+    Note over Target,Storage: 3-Layer Outcome Oracle Verification
+    rect rgb(240, 255, 240)
+        Note right of Storage: 1. Domain Logic: Result verified<br/>2. DB Persistence: Re-queried from disk<br/>3. Visual UI: Assert element presence<br/>4. Negative Control: Malformed input rejected
     end
-
-    Note over Orch: Phase 2: Partition Tasks (Mock Bound to Plan)
-    Orch->>Ledger: Populate PLAN_TASKS.md (Ref: Approved Mock)
-
-    rect rgb(30, 41, 59)
-        Note over Lanes,QA: Phase 3: Delegated Execution & Peer Review
-        Orch->>Lanes: Assign Tasks (Ponytail Ladder Enforced)
-        Lanes->>Lanes: Internal Lane Implementation
-        Lanes->>QA: Submit PR Diff for Peer Review
-        QA-->>Lanes: Critique (Max 2 Rounds)
-        alt Hard Blocker Found
-            Lanes->>Lanes: Implement Immediate Patch
-        else Deferred Shortcut
-            Lanes->>Ledger: Tag // ponytail: and record in Debt Ledger
-        else Cross-Lane Deadlock
-            Orch->>Lanes: ⚡ Antigravity Supreme Arbiter Verdict
-        end
-    end
-
-    Note over Orch,QA: Phase 4 & 5: Platform Stress & Commit
-    QA->>Orch: Pass Static Analysis & Test Matrix
-    Orch->>Dev: Clean Git Commit (Trailers: Co-authored-by / X-AI-Lane)
 ```
 
----
+### The 4 Verification Pillars
 
-## 🌐 Dynamic Domain Audit Packs
-
-MACA dynamically adapts its auditing standards to the project's exact domain:
-
-| Domain Pack | Automatic Trigger Conditions | Mandatory Audit Focus |
-| :--- | :--- | :--- |
-| **Clinical, Health & SaMD** | Terms: `patient`, `vital`, `dosage`, `clinical`, `ehr`, `fhir`, `dicom`, `health` | **IEC 62304 / ISO 14971** risk analysis, WHO guidelines, strict zero-float dosage typing, HIPAA/GDPR PHI sanitization, fail-safe visual alarms. |
-| **FinTech & Payments** | Terms: `payment`, `ledger`, `wallet`, `pci`, `stripe`, `bank`, `invoice`, `transaction` | **PCI-DSS & SOC-2**, exact arbitrary-precision arithmetic (`Decimal`/`BigInt`), mutation idempotency keys, double-entry balance verification. |
-| **Systems & Low-Level** | Languages: `Rust`, `C++`, `Zig`, `Go`, `C` | **RAII memory lifetimes**, zero double-free/leak, lock hierarchy order (anti-deadlock), zero heap-allocation in hot render/audio loops. |
-| **Core Fullstack (Default)** | All standard web, mobile, and backend apps | **WCAG 2.1 AA accessibility**, zero Cumulative Layout Shifts (CLS), OWASP Top 10 vulnerabilities, UTF-8 bidirectional normalization. |
+1. **User-Selected Scenario Modes**:
+   * **Mode A (Predefined)**: Hardcoded deterministic test matrices and compliance fixtures.
+   * **Mode B (Imaginary Stress Scenarios)**: Generates high-friction edge cases (e.g., dead battery mid-transaction, double taps, rapid orientation flips).
+   * **Mode C (Custom Multi-Step)**: User or agent inputs specific step-by-step real user actions.
+2. **The Anti-Bulk-Mock Rule**: Banned from loading pre-baked complete final states. Tests must fast-forward through intake and sequentially apply chronological state transitions ($T_0 \to T_1 \to T_2$).
+3. **Multi-Caller Call-Chain Tracing**: Validates upstream callers ($F_{upstream}$) and downstream listeners ($F_{downstream}$) under test, strictly banning internal function mocks.
+4. **3-Layer Outcome Oracle**:
+   $$\text{Oracle} = \text{Domain Logic Result} \land \text{Storage/DB Persistence} \land \text{Visual UI Confirmation} \land \text{Negative Control}$$
 
 ---
 
-## 🛟 3-Tier Scarcity Cascade
+## ✂️ The 7-Rung Ponytail Minimalism Engine
 
-Never crash when external CLIs or specific models are unavailable:
+AI models tend to generate unnecessary abstractions. MACA forces every architectural decision through the **7-Rung Ponytail Decision Ladder** ([`references/ponytail_ladder.md`](references/ponytail_ladder.md)). Agents must exhaust lower rungs before reaching for higher rungs.
 
 ```mermaid
 flowchart TD
-    Start["Launch Task"] --> T1{"Tier 1: Delegate Skills & CLIs Available?<br/>(claude-delegate, opencode-delegate, codex-delegate, agy-delegate)"}
-    T1 -- Yes --> E1["Dispatch via File-Based Delegate Relay Scripts"]
-    T1 -- No --> T2{"Tier 2: Platform Subagents Available?<br/>(Antigravity invoke_subagent)"}
-    T2 -- Yes --> E2["Spawn Isolated Subagents with Dedicated Role Personas & Workspaces"]
-    T2 -- No --> T3["Tier 3: Single-Model Multi-Session Tabula Rasa<br/>(Session A: Implementer ➔ Session B: Clean-Context Adversarial Reviewer)"]
+    R1["Rung 1: YAGNI / Zero Code<br/>Delete unnecessary requirements or dead code"]
+    R2["Rung 2: Existing Helper Reuse<br/>Leverage utilities already in codebase"]
+    R3["Rung 3: Language Standard Library<br/>Built-in primitives (Kotlin stdlib, Python collections, TS Array)"]
+    R4["Rung 4: Single Local Utility Function<br/>Self-contained, pure function in same module"]
+    R5["Rung 5: Existing Direct Dependency<br/>Utilize already imported libraries"]
+    R6["Rung 6: New Trusted Dependency<br/>Battle-tested, lightweight package (Requires justification)"]
+    R7["Rung 7: Custom Architecture / Subsystem<br/>New classes, design patterns, microservices (Supreme Arbiter Approval Required)"]
 
-    style T1 fill:#3b82f6,color:#fff
-    style T2 fill:#8b5cf6,color:#fff
-    style T3 fill:#ec4899,color:#fff
+    R1 -->|If insufficient| R2
+    R2 -->|If insufficient| R3
+    R3 -->|If insufficient| R4
+    R4 -->|If insufficient| R5
+    R5 -->|If insufficient| R6
+    R6 -->|If unavoidable| R7
+
+    style R1 fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style R2 fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style R3 fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style R4 fill:#fef9c3,stroke:#ca8a04,stroke-width:2px
+    style R5 fill:#fef9c3,stroke:#ca8a04,stroke-width:2px
+    style R6 fill:#fee2e2,stroke:#dc2626,stroke-width:2px
+    style R7 fill:#fecaca,stroke:#b91c1c,stroke-width:3px
 ```
+
+* **Target Goal**: $\ge 75\%$ of all logic resolved in **Rungs 1–3**.
+* **Debt Tagging**: Any code requiring Rung 6 or 7 must be annotated with:
+  ```text
+  // ponytail: [Rung 6] Justification for new external dependency
+  ```
 
 ---
 
-## 📦 Directory Structure
+## 🏛️ Skill Ambassador & Procedural Compliance Referee
 
-```text
-skills/multi-agent-collaborative-audit/
-├── SKILL.md                          # Comprehensive agent runbook & instructions
-├── README.md                         # Public documentation and visual architecture
-├── scripts/
-│   ├── bootstrap.sh                  # Non-blocking fleet discovery & engine probe
-│   └── measure_metrics.py            # Local telemetry parser & single-page web server
-├── references/
-│   ├── ponytail_ladder.md            # In-depth guide for the 7-Rung Ponytail Ladder
-│   ├── domain_packs.md               # Specifications for Clinical, FinTech, Systems packs
-│   ├── ui_ux_mocking.md              # UI/UX Mocking, Claude routing & Visual Gate protocol
-│   ├── coding_guidelines.md          # Clean code, UDF architecture & idiomatic guidelines
-│   └── deep_diagnostics.md           # Low-level Logcat, Memory, Crashlytics & Pre-Release testing
-└── resources/
-    ├── dashboard/
-    │   └── index.html                # Single-Page Application (SPA) Cockpit UI
-    └── templates/
-        ├── AGENTS.template.md         # Multi-agent role matrix template
-        ├── AI_HANDOFF_LEDGER.template.md # Handoff log, critique tracker, and debt ledger
-        └── SPEC_AND_AUDIT.template.md    # Zero-presumption audit & specification contract
-```
+MACA includes a deterministic compliance referee engine ([`scripts/skill_ambassador_auditor.py`](scripts/skill_ambassador_auditor.py)) that acts as an independent procedural auditor.
+
+### Enforced Compliance Gates
+
+| Gate ID | Mandatory Rule | Required Evidence | Automatic Verdict |
+| :---: | :--- | :--- | :---: |
+| **G-01** | Phase 0 Bootstrap & Scripts | `./scripts/bootstrap.sh` exit code `0` | `PASS` / `FAIL` |
+| **G-02** | Phase 1 Spec & Call-Chain Map | `.agents/SPEC_AND_AUDIT.md` mapped callers | `PASS` / `BLOCKED` |
+| **G-03** | Phase 1.5 Visual Mock Gate | `.agents/mocks/*.html` user sign-off | `PASS` / `BLOCKED` |
+| **G-04** | Phase 3 Tabula Rasa Diff Audit | Peer critique in `AI_HANDOFF_LEDGER.md` (No fake `[In-Process]`) | `PASS` / `BLOCKED` |
+| **G-05** | Phase 4.1 Scenario Mode Choice | Mode A, B, or C explicitly documented | `PASS` / `BLOCKED` |
+| **G-06** | Phase 4.2 Anti-Bulk-Mock Rule | Chronological event transitions ($T_0 \to T_1 \to T_2$) | `PASS` / `BLOCKED` |
+| **G-07** | Phase 4.3 Call-Chain & Zero Mock | Zero internal function mocks detected | `PASS` / `BLOCKED` |
+| **G-08** | Phase 4.4 3-Layer Outcome Oracle | Logic + Storage + UI + Negative Control | `PASS` / `BLOCKED` |
+| **G-09** | Task Queue Synchronization | `tasks/current_task.md` marked `- [x]` with date & proof | `PASS` / `BLOCKED` |
 
 ---
 
-## 📊 Telemetry, Metrics & The Single-Page Cockpit
+## 📊 Telemetry, Cockpit Dashboard & Native Notifications
 
-MACA features an integrated **Evaluation & Telemetry Cockpit** that measures how effectively the skill is used across repositories and displays real-time evidence in a modern dark-mode Single-Page Application (SPA).
+Track project metrics in real time with [`scripts/measure_metrics.py`](scripts/measure_metrics.py).
 
-```
-[ Git Logs / Commit Trailers ] ──┐
-                                 ▼
-[ AI_HANDOFF_LEDGER.md ] ───────► [ scripts/measure_metrics.py ] ──► 🌐 http://127.0.0.1:8420
-                                 ▲                                     (Interactive Web Dashboard)
-[ Related Projects Scanner ] ───┘
-```
-
-### 1. Launching the Web Cockpit
-Run the telemetry script in any repository:
 ```bash
-# Launch interactive web dashboard in default browser (port 8420)
+# Launch interactive web dashboard (port 8420)
 ./scripts/measure_metrics.py
 
-# Or export standalone HTML without starting a server
-./scripts/measure_metrics.py --export-html telemetry_report.html
+# Send native macOS desktop notification upon gate or task completion
+./scripts/measure_metrics.py --notify "MACA E2E Complete" "Sequential Oracle & Call-Chain passed!"
 
-# Or output structured JSON for CI/CD pipelines
+# Output structured JSON metrics for CI/CD pipelines
 ./scripts/measure_metrics.py --json
+
+# Run built-in self-test verification suite
+./scripts/measure_metrics.py --self-test
 ```
 
-### 2. What the Dashboard Measures
-* **Overall Efficacy Score (0–100 & Letter Grade)**: Synthesized from Ponytail compliance, review turnaround speed, and zero regression.
-* **Ponytail Simplicity Index**: Percentage of architectural solutions resolved in Rungs 1–3 (YAGNI, Repo Helpers, Standard Library) vs. Rungs 6–7 (Custom/Complex).
-* **First-Turn Review Pass Rate**: Percentage of code patches approved in Round 1 without requiring rework.
+### Key Metrics Monitored
+
+* **Overall Efficacy Score (0–100 & Letter Grade)**: Synthesized from simplicity, test pass rate, and review cycle speed.
+* **Ponytail Simplicity Index**: Percentage of architectural solutions resolved in Rungs 1–3 vs Rungs 6–7.
+* **First-Turn Pass Rate**: Percentage of code patches approved in Round 1 without rework.
 * **Arbiter Escalation Count**: Number of cross-lane disputes escalated to the Antigravity Supreme Arbiter.
-* **Evidence & Audit Trail**: Real-time table displaying commit SHAs, author lanes, verified scopes, and Ponytail debt tickets (`// ponytail:`).
-* **Related Workspace Projects**: Scans neighboring repositories and reports their branch status, governance adoption, and git cleanliness.
+* **Git Evidence & Provenance Trail**: Live table displaying commit SHAs, author lanes, verified scopes, and Ponytail debt tags.
 
 ---
 
-## ⚖️ Architectural Trade-Offs (Pros & Cons)
+## 🎛️ Tooling Inventory & Multi-Tier Scarcity Cascade
 
-| Dimension | Strengths (Pros) | Trade-Offs (Cons) & Mitigations |
-| :--- | :--- | :--- |
-| **Code Simplicity** | Eliminates AI bloat; enforces standard library and existing helpers first. | Over-minimalism risk. *Mitigated by strict safety/validation guardrails.* |
-| **Review Velocity** | Capped at 2 rounds; Antigravity Arbiter breaks deadlocks instantly. | Requires capable orchestrator model to make sound tie-breaking rulings. |
-| **Scarcity Resilience** | Cascades smoothly across 3 tiers (CLIs $\rightarrow$ Subagents $\rightarrow$ Personas). | External CLIs (Tier 1) require local PATH installation. |
-| **Task Overhead** | Ensures zero-presumption rigor on complex or clinical code. | Heavy for 1-line typo fixes. *Mitigated by Fast-Path Hotfix Bypass.* |
-| **Non-Destruction** | Zero header comments injected into code; no lint/CI breakage. | Relies on `.agents/` directory governance and Git commit metadata. |
+MACA dynamically adapts to your local machine using a **3-Tier Scarcity Cascade**:
+
+```mermaid
+flowchart TD
+    Start["Task Initiated"] --> T1Check{"Are External Fleet CLIs<br/>installed in PATH?"}
+    
+    T1Check -->|Yes| Tier1["Tier 1: Full External Fleet<br/>• Claude Code CLI (@anthropic-ai/claude-code)<br/>• OpenCode CLI (opencode)<br/>• Codex CLI (codex)<br/>• Gemini CLI (@google/gemini-cli)<br/>• E2E Runner (e2e)<br/>• Mobile Runner (maestro)"]
+    
+    T1Check -->|No| T2Check{"Are Subagents / MCP<br/>available in IDE?"}
+    
+    T2Check -->|Yes| Tier2["Tier 2: IDE Subagents & MCP<br/>• Delegate via Antigravity Subagents<br/>• Execute tools via local MCP servers"]
+    
+    T2Check -->|No| Tier3["Tier 3: Single-Model Tabula Rasa<br/>• Antigravity resets context per turn<br/>• Simulates isolated adversarial personas<br/>• Strictly enforces max 2 review rounds"]
+```
+
+### Complete Tooling Matrix
+
+| Tool | Category | Installation Command | Purpose |
+| :--- | :--- | :--- | :--- |
+| **`claude`** | AI Fleet CLI | `npm install -g @anthropic-ai/claude-code` | Claude 3.5 Sonnet UI/UX Mocking Lane |
+| **`opencode`** | AI Fleet CLI | `brew install opencode` | Core Logic (DeepSeek) & Data (GLM) Lane |
+| **`codex`** | AI Fleet CLI | `brew install codex` | Algorithmic logic & optimization |
+| **`gemini`** | AI Fleet CLI | `npm install -g @google/gemini-cli` | Full-repo review & QA fallback lane |
+| **`agy`** | AI Fleet CLI | `brew install agy` | Native Antigravity CLI delegation |
+| **`e2e`** | E2E Engine | `npm install -g e2e` | Hybrid AI + Deterministic E2E testing |
+| **`maestro`** | Mobile E2E | `curl -Ls 'https://get.maestro.mobile.dev' \| bash` | Mobile UI declarative flow automation |
+| **`playwright`**| Web E2E | `npm install -g playwright` | Headless browser execution & DOM capture |
+| **`adb`** | Mobile Device| Android Platform-Tools | Android emulator & physical device bridge |
 
 ---
 
-## 🚀 Quickstart & Usage
+## 🚀 Quickstart
 
-### 1. Verification & Bootstrap
-Run the non-blocking discovery script to inspect your environment:
+### 1. Verify Environment & Preflight
+Run the one-time deep diagnostic and preflight check:
 ```bash
+# Run first-run preflight
+python3 scripts/first_run_preflight.py
+
+# Verify bootstrap readiness
 ./scripts/bootstrap.sh
 ```
 
-Sample output:
-```text
-🔍 [Bootstrap] Verifying 'delegate-skills' orchestration engine...
-🔎 [Fleet Discovery] Scanning available engine runtimes...
-  ✔️ Detected runtime CLI: opencode (/usr/local/bin/opencode)
-  ✔️ Detected runtime CLI: codex (/usr/local/bin/codex)
-  ✔️ Detected runtime CLI: gh (/usr/local/bin/gh)
-✅ Fleet Discovery complete: 3 runtime CLI(s) available for delegation.
-🚀 [Bootstrap] Engine ready. Orchestrator can proceed with lane allocation.
-```
-
-### 2. Invoking with Antigravity
-Mount the skill in your project or global customizations:
+### 2. Initialize a Task in Your Workspace
+To audit an existing project or initialize a new feature with the Skill Ambassador:
 ```bash
-mkdir -p .agents/skills
-cp -r /path/to/multi-agent-collaborative-audit .agents/skills/
+python3 scripts/skill_ambassador_auditor.py --init-log /path/to/project --feature "FeatureName"
 ```
 
-When you prompt Antigravity with a complex feature or audit task, it automatically reads `SKILL.md`, initializes `.agents/AGENTS.md`, and orchestrates the fleet lanes.
+### 3. Verify Code with the E2E Scenario Engine
+```bash
+# Run scenario & call-chain verification suite
+python3 scripts/scenario_and_callchain_engine.py --self-test
+```
 
 ---
 
-## 🤝 Affiliations & Philosophical Lineage
+## 📜 License & Provenance
 
-This skill proudly adopts and builds upon foundational philosophies from the AI agent engineering community:
+Licensed under the [MIT License](LICENSE).
 
-1. **The Ponytail Philosophy**: Pioneered as an uncompromising defense against LLM over-abstraction and bloat. Ponytail dictates that the best code is the simplest code that completely satisfies functional, safety, and accessibility requirements. We formalize this into the **7-Rung Ponytail Decision Ladder**.
-2. **The Delegate-Skills Protocol**: Pioneered for multi-agent delegation, lane partitioning, and persistent handoff governance. MACA operationalizes this protocol into automated bootstrap routines, decoupled lane boundaries, and deterministic arbitration.
-
----
-
-## 📜 License
-
-Licensed under the [MIT License](LICENSE). Contributions, domain pack additions, and multi-agent enhancements are welcome!
+Authored and maintained under the **Multi-Agent Collaborative Audit (MACA)** framework with **Google Antigravity** as Principal Consultant and Lead Orchestrator.

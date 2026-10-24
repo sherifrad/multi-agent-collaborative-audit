@@ -1,89 +1,38 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Script: bootstrap.sh
-# Purpose: Non-blocking discovery, health-check, and initialization for
-#          the 'delegate-skills' orchestration environment.
+# Purpose: 1. Runs One-Time First-Run Deep Diagnostic (first_run_preflight.py)
+#             on initial use (or when skill scripts change), surfacing any
+#             missing tools with actionable remediation steps.
+#          2. Runs fast lightweight scan on subsequent runs.
 # ==============================================================================
 
 set -uo pipefail
 
-DELEGATE_DIR="${DELEGATE_SKILLS_DIR:-$HOME/.config/delegate-skills}"
-REPO_FALLBACK_URL="${DELEGATE_REPO_URL:-}"
-EXIT_STATUS=0
+export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/Library/Android/sdk/platform-tools"
 
-echo "🔍 [Bootstrap] Verifying 'delegate-skills' orchestration engine..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+STAMP_FILE="$SKILL_ROOT/.first_run_verified.json"
 
-# 1. Check directory presence
-if [ ! -d "$DELEGATE_DIR" ]; then
-    echo "⚠️ Directory '$DELEGATE_DIR' does not exist."
-    if [ -n "$REPO_FALLBACK_URL" ] && command -v git >/dev/null 2>&1; then
-        echo "🔄 Cloning from provided DELEGATE_REPO_URL: $REPO_FALLBACK_URL..."
-        if git clone --depth 1 "$REPO_FALLBACK_URL" "$DELEGATE_DIR" 2>/dev/null; then
-            echo "✅ Successfully cloned delegate-skills."
-        else
-            echo "⚠️ Clone failed. Initializing empty local workspace directory..."
-            mkdir -p "$DELEGATE_DIR"
-            EXIT_STATUS=2
-        fi
-    else
-        echo "ℹ️ No remote git URL configured. Initializing local sandbox directory..."
-        mkdir -p "$DELEGATE_DIR"
-        EXIT_STATUS=2
-    fi
-else
-    # 2. Directory exists, check if it's a git repo
-    if [ -d "$DELEGATE_DIR/.git" ] && command -v git >/dev/null 2>&1; then
-        echo "🔄 Git repository detected. Checking remote updates..."
-        # Avoid hanging on interactive prompts or broken networks
-        if git -C "$DELEGATE_DIR" pull --ff-only --timeout=5 origin main >/dev/null 2>&1; then
-            echo "✅ 'delegate-skills' successfully updated from remote."
-        else
-            echo "ℹ️ Network offline, branch mismatch, or timeout. Using cached local version."
-        fi
-    else
-        echo "ℹ️ Local non-git directory active. Using local configuration."
-    fi
+FORCE_FIRST_RUN=0
+if [ "${1:-}" = "--force-first-run" ]; then
+    FORCE_FIRST_RUN=1
 fi
 
-# 3. Detect available delegate-skills relays & external model CLIs
-echo "🔎 [Delegate Skills Discovery] Scanning installed delegate relays..."
-FOUND_DELEGATES=0
-for dskill in "claude-delegate" "opencode-delegate" "codex-delegate" "agy-delegate"; do
-    if [ -d "$HOME/.agents/skills/$dskill" ] || [ -d "$HOME/.config/opencode/skills/$dskill" ]; then
-        echo "  ✔️ Detected delegate skill: $dskill"
-        FOUND_DELEGATES=$((FOUND_DELEGATES + 1))
+echo "🔍 [MACA Bootstrap] Checking First-Run Verification Status..."
+
+if [ ! -f "$STAMP_FILE" ] || [ "$FORCE_FIRST_RUN" -eq 1 ]; then
+    echo "🚀 [First-Run Diagnostic] Executing one-time deep self-test of all skill files, relays, and external tools..."
+    if ! python3 "$SCRIPT_DIR/first_run_preflight.py" --force; then
+        echo "❌ [MACA_SCRIPT_ERROR — STOP_AND_FIX] First-run internal integrity check failed! Do NOT bypass."
+        exit 2
     fi
-done
-
-echo "🔎 [Fleet Discovery] Scanning available engine runtimes..."
-FOUND_CLIS=0
-
-for cli in "claude" "opencode" "deepseek" "gemini" "codex" "gh"; do
-    if command -v "$cli" >/dev/null 2>&1; then
-        echo "  ✔️ Detected runtime CLI: $cli"
-        FOUND_CLIS=$((FOUND_CLIS + 1))
-    fi
-done
-
-echo "🔎 [Diagnostic Plugins Discovery] Scanning testing & profiling skills..."
-for diag in "android-profiler" "android-cli" "firebase-crashlytics" "testing-setup" "a11y-debugging"; do
-    if [ -d "$HOME/.gemini/config/skills/$diag" ] || [ -d "$HOME/.agents/skills/$diag" ]; then
-        echo "  ✔️ Detected diagnostic skill: $diag"
-    fi
-done
-
-if [ "$FOUND_CLIS" -eq 0 ]; then
-    echo "ℹ️ No external model CLIs detected in PATH."
-    echo "   Fleet Orchestrator will activate Tier-2 (Subagents) or Tier-3 (Single-Model Multi-Session Tabula Rasa)."
+    echo "⚠️ [Mandatory Agent Action] First-run diagnostic completed. Review 'missing_external_tools' above and inform the user of any missing tools + their remediation commands before proceeding!"
 else
-    echo "✅ Fleet Discovery complete: $FOUND_CLIS runtime CLI(s) and $FOUND_DELEGATES delegate skill(s) available."
+    echo "✅ [Fast Path] First-run deep check already verified ($STAMP_FILE). Running lightweight scan..."
+    python3 "$SCRIPT_DIR/first_run_preflight.py"
 fi
 
-# 4. Final status report
-if [ "$EXIT_STATUS" -eq 0 ]; then
-    echo "🚀 [Bootstrap] Engine ready. Orchestrator can proceed with lane allocation."
-    exit 0
-else
-    echo "⚠️ [Bootstrap] Degraded/Sandbox mode active (status code: $EXIT_STATUS). Proceeding with local fallbacks."
-    exit 0
-fi
+echo "🚀 [Bootstrap] Engine ready."
+exit 0

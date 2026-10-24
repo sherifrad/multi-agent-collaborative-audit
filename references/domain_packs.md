@@ -1,6 +1,6 @@
 # Dynamic Domain Audit Packs
 
-The orchestrator dynamically selects and applies domain-specific audit rules during **Phase 1 (Zero-Presumption Audit)** and **Phase 4 (Specialist Audit & Verification)**.
+The orchestrator dynamically selects and applies domain-specific audit rules during **Phase 1 (Zero-Presumption Audit)** and **Phase 4 (Dedicated E2E, Sequential Scenario & Call-Chain Verification)**.
 
 ---
 
@@ -14,37 +14,43 @@ The orchestrator dynamically selects and applies domain-specific audit rules dur
 * **Core Logic Lane Focus**:
   * Algorithmic time/space complexity (avoid $O(N^2)$ inside loops or hot paths).
   * Concurrency safety (thread locks, race conditions, cancellation tokens).
-  * Resource cleanup (streams, listeners, database handles, sockets).
+  * Cross-function call-chain consistency across all callers.
 * **Data Lane Focus**:
   * Strict schema types, non-nullable defaults, migration backward-compatibility.
-  * Input sanitization, parameter validation.
+  * Input sanitization, parameter validation, and round-trip persistence fidelity.
   * Internationalization: RTL mirroring, UTF-8 unicode normalization.
-* **QA & Security Lane Focus**:
+* **QA & E2E Audit Lane Focus**:
   * OWASP Top 10 vulnerabilities (SQLi, XSS, SSRF, IDOR).
-  * Boundary value testing (empty arrays, integer overflow, extreme string lengths).
+  * Sequential E2E user journeys and boundary value testing.
 
 ---
 
 ## 2. Clinical, Healthcare & SaMD Pack
-*Activated automatically if keywords like `patient`, `vital`, `dosage`, `clinical`, `ehr`, `fhir`, `dicom`, `triage`, `medical`, or `health` are detected in the repository or task description.*
+*Activated automatically if keywords like `patient`, `vital`, `dosage`, `clinical`, `partogram`, `labour`, `ehr`, `fhir`, `dicom`, `triage`, `medical`, or `health` are detected in the repository or task description.*
 
 * **Regulatory & Safety Baseline**:
   * **IEC 62304 / ISO 14971**: Software safety classification and risk management.
-  * **WHO Clinical Guidelines & Protocols**: Verify diagnostic/therapeutic reference values against established medical literature.
-  * **FDA SaMD Guidance**: Clinical evaluation, algorithm transparency, and verification of non-diagnostic vs diagnostic claims.
+  * **WHO Clinical Guidelines & Local Protocols (e.g., WHO LCG / EHC / FIGO)**: Verify diagnostic/therapeutic reference values against established medical literature.
+  * **FDA SaMD Guidance**: Clinical evaluation, algorithm transparency, and strict separation of reference highlights vs. diagnostic/therapeutic claims.
 * **Clinical Lane Mandatory Checks**:
-  * **Dosage & Unit Integrity**: Strict unit typing (e.g., `mg` vs `mcg` vs `mL` with no implicit float coercion).
-  * **Fail-Safe Fallbacks**: If network or sensor data drops, clinical UI must display explicit "STALE DATA" warnings rather than caching old vitals without timestamps.
-  * **Offline-First Authentication & Shift Handovers**: 
-    - Shared tablet support: Delivery ward tablets are shared by multiple clinicians across shifts.
-    - Session vs Account distinction: Clinical logout (`clearSession`) must **never** wipe offline doctor credential vaults (`AccountStore`), preventing shift lockout during emergency power or internet outages.
-    - Zero plain-text credentials in logs or Firestore documents.
+  * **Dosage & Unit Integrity**: Strict scaled-integer unit typing (e.g., `dilatationTenths`, `temperatureTenthsCelsius`, `mg` vs `mcg` vs `mL` with zero implicit `Float.toInt()` truncation or binary float coercion).
+  * **Sequential Longitudinal Verification (Anti-Bulk-Mock Rule)**:
+    - Clinical rules that depend on time progression (such as cervical arrest lag thresholds, repeat blood pressure confirmation 15–30m apart, or consecutive 10-minute contraction windows) **must never** be verified solely via static pre-built snapshots.
+    - Phase 4 tests must fast-forward only the static patient header (`Name`, `Age`, `Parity`, `Admission Time`) and enter time-series observations sequentially step by step ($T_0 \to T_{+1\text{h}} \to T_{+2\text{h}} \to T_{+5\text{h}}$) through the real save and re-evaluation pipeline.
+  * **Shift & Case Handoff Integrity (تسليم الحالات - Case Handoff)**:
+    - Shared tablet support: Delivery ward tablets and mobile devices are shared across shifts.
+    - Structured Handoff Verification: E2E tests must verify that handing off an active case preserves and prominently surfaces: (1) current labour stage and progression clock, (2) latest cervical/fetal/maternal observations, (3) all active or unacknowledged clinical alerts (`IMMEDIATE_SAFETY_ACTION`, `WHO_REFERENCE`, `EHC_SPECIALIST_REVIEW`), (4) next monitoring/reassessment due times (`MONITORING_DUE`), and (5) explicit audit attribution of the outgoing and incoming clinicians.
+    - Session vs Account distinction: Clinical session handoff/logout must **never** wipe persisted patient records, audit trails, or offline credential vaults.
+  * **Owner Broadcast / Senior Guidance Zone vs. Clinical Alerts Separation**:
+    - When the application includes a dedicated zone for Owner/Senior Clinician clarifications, notes, or broadcasts to the medical team, E2E verification must confirm:
+      1. **Visual & Semantic Isolation**: Owner announcements render in their dedicated guidance container and never mimic, overwrite, or obscure patient-specific clinical alerts (`ActiveAlertQueue`).
+      2. **Zero Bedside Friction**: Viewing or dismissing an owner announcement never blocks or delays the `<15s` rapid bedside observation entry workflow.
   * **Bedside Ergonomics & Narrow Screens**:
-    - Glove-friendly inputs: Primary steppers and presets with $\ge 48\text{dp}$ touch targets.
+    - Glove-friendly inputs: Primary steppers and quick-select chips with $\ge 48\text{dp}$ touch targets.
     - Narrow-screen resilience: Test against $320\text{dp}$ and $360\text{dp}$ viewports to prevent vital sign clipping or horizontal truncation.
-    - Anti-Aesthetic Inflation: Avoid high-CPU animated blurs, pulsing waves, or glassmorphism that drain battery or distract under surgical lights.
-  * **HIPAA / GDPR Health Data**: No PHI/PII in log files, crash reports, or analytics payloads. Encryption at rest and in transit (TLS 1.3).
-  * **Audit Logging**: Immutable, tamper-evident audit logs for every user action affecting patient state or medical orders.
+  * **HIPAA / GDPR Health Data & Audit Logging**:
+    - No PHI/PII in log files, crash reports, or analytics payloads.
+    - Immutable, append-only (`CURRENT`, `CORRECTED`, `ENTERED_IN_ERROR`) tamper-evident audit logs for every action affecting patient state.
 
 ---
 

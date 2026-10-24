@@ -16,3 +16,4 @@ __pycache__/
 *.log
 tmp/
 .temp/
+.first_run_verified.json
