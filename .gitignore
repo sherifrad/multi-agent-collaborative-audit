@@ -17,3 +17,4 @@ __pycache__/
 tmp/
 .temp/
 .first_run_verified.json
+.agents/

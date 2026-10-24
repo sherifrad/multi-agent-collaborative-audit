@@ -11,7 +11,36 @@
 
 ---
 
+## 📑 Table of Contents
+
+* [🎯 Overview & Mission](#-overview--mission)
+  * [The 4 Fatal AI Engineering Failure Modes](#the-4-fatal-ai-engineering-failure-modes)
+* [🏛️ Model-Agnostic Fleet Architecture](#-model-agnostic-fleet-architecture)
+  * [Lane Competency Contracts](#lane-competency-contracts)
+* [🔌 Dynamic Multi-Adapter Fleet Router & Zero-API Resilience](#-dynamic-multi-adapter-fleet-router--zero-api-resilience)
+  * [The 4 Execution Adapters](#1-the-4-universal-execution-adapters)
+  * [Declarative Fleet Manifest (`.agents/fleet.json`)](#2-declarative-fleet-manifest-agentsfleetjson)
+  * [Fail-Safe Cascade & Unreachable Server Resilience](#3-unreachable-server--fail-safe-cascade)
+  * [Detection, Self-Repair & Resilience Testing](#4-built-in-detection-self-repair--resilience-testing)
+* [🔄 The 5-Phase SDD Engineering Workflow](#-the-5-phase-sdd-workflow)
+  * [Detailed Gate Breakdown](#detailed-gate-breakdown)
+* [🧪 Phase 4: Dedicated Sequential E2E & Call-Chain Verification Zone](#-phase-4-dedicated-sequential-e2e--call-chain-verification-zone)
+  * [The 4 Verification Pillars](#the-4-verification-pillars)
+* [✂️ The 7-Rung Ponytail Minimalism Engine](#-the-7-rung-ponytail-minimalism-engine)
+* [🏛️ Skill Ambassador & Procedural Compliance Referee](#-skill-ambassador--procedural-compliance-referee)
+* [📊 Telemetry, Cockpit Dashboard & Native Notifications](#-telemetry-cockpit-dashboard--native-notifications)
+* [🚀 Quickstart & Developer Tracks](#-quickstart--developer-tracks)
+  * [Track 1: Solo Developer ($0 Zero-API Mode)](#track-1-solo-developer-0-zero-api-mode)
+  * [Track 2: Power User (Local AI CLIs)](#track-2-power-user-local-ai-clis)
+  * [Track 3: Custom APIs & Local Models (Ollama / DeepSeek)](#track-3-custom-apis--local-models-ollama--deepseek)
+* [🛠️ Engine Script Cheatsheet](#-engine-script-cheatsheet)
+* [📜 License & Provenance](#-license--provenance)
+
+---
+
 ## 🎯 Overview & Mission
+
+### The 4 Fatal AI Engineering Failure Modes
 
 Modern AI-assisted software engineering suffers from **four fatal failure modes**:
 
@@ -24,7 +53,7 @@ Modern AI-assisted software engineering suffers from **four fatal failure modes*
 
 ---
 
-## 🏛️ Model-Agnostic Fleet Architecture & Lane Contracts
+## 🏛️ Model-Agnostic Fleet Architecture
 
 MACA decouples software delivery into specialized, isolated **Fleet Lanes**. Rather than hardcoding rigid models, each lane is defined by a **Functional Competency Contract** that can be powered by your choice of local CLIs, direct APIs, local LLMs (Ollama), or native zero-cost In-IDE subagents.
 
@@ -106,7 +135,7 @@ flowchart TD
 
 ### 2. Declarative Fleet Manifest (`.agents/fleet.json`)
 
-To customize your fleet, create `.agents/fleet.json` (or generate one with `python3 scripts/fleet_dispatch.py --init-config`):
+To customize your fleet, create `.agents/fleet.json` (or generate one automatically with `python3 scripts/fleet_dispatch.py --init-config`):
 
 ```json
 {
@@ -130,8 +159,8 @@ To customize your fleet, create `.agents/fleet.json` (or generate one with `pyth
       "fallback": { "adapter": "subagent", "role_name": "Data Architect" }
     },
     "qa_referee": {
-      "primary": { "adapter": "subagent", "role_name": "QA Referee" },
-      "fallback": { "adapter": "subagent", "role_name": "Emergency Auditor" }
+      "primary": { "adapter": "cli", "binary": "gemini", "args": ["-p", "{brief}"] },
+      "fallback": { "adapter": "subagent", "role_name": "QA Referee" }
     }
   }
 }
@@ -353,38 +382,58 @@ Track project metrics in real time with [`scripts/measure_metrics.py`](scripts/m
 
 ---
 
-## 🚀 Quickstart
+## 🚀 Quickstart & Developer Tracks
 
-### 1. Verify Environment & Preflight
-Run the one-time deep diagnostic and preflight check:
+Choose the track that fits your development environment:
+
+### Track 1: Solo Developer ($0 Zero-API Mode)
+* **Pre-requisites**: None! No external API keys, zero paid subscriptions.
+* **How it works**: Antigravity automatically uses native In-IDE subagents and context-isolated personas.
 ```bash
-# Run first-run preflight (validates all internal scripts & tools)
-python3 scripts/first_run_preflight.py
-
-# Verify bootstrap readiness
+# 1. Run bootstrap check
 ./scripts/bootstrap.sh
+
+# 2. Initialize project governance charter
+python3 scripts/skill_ambassador_auditor.py --init-log . --feature "MyFeature"
 ```
 
-### 2. Configure or Auto-Detect Fleet
+### Track 2: Power User (Local AI CLIs)
+* **Pre-requisites**: Installed CLIs (`claude`, `opencode`, `codex`, `gemini`, `agy`).
+* **How it works**: The router automatically dispatches tasks across your installed tools with fallback protection.
 ```bash
-# Detect local tools (CLIs, API keys, Zero-API readiness)
+# 1. Detect installed CLIs
 python3 scripts/fleet_dispatch.py --detect-only
 
-# Initialize tailored fleet manifest in your workspace
+# 2. Initialize tailored fleet config
 python3 scripts/fleet_dispatch.py --init-config
+
+# 3. Dispatch a task to any lane
+python3 scripts/fleet_dispatch.py --dispatch ui_ux --brief "Build responsive SVG header"
 ```
 
-### 3. Initialize a Task in Your Workspace
-To audit an existing project or initialize a new feature with the Skill Ambassador:
+### Track 3: Custom APIs & Local Models (Ollama / DeepSeek)
+* **Pre-requisites**: Local Ollama server or standard API keys in environment.
+* **How it works**: Declare your custom endpoints in `.agents/fleet.json`:
 ```bash
-python3 scripts/skill_ambassador_auditor.py --init-log /path/to/project --feature "FeatureName"
+# Point core_logic to local Ollama (100% private, free):
+# In .agents/fleet.json -> endpoint: "http://127.0.0.1:11434/v1/chat/completions"
+
+# Validate manifest syntax & reachability
+python3 scripts/fleet_dispatch.py --validate .agents/fleet.json
 ```
 
-### 4. Verify Code with the E2E Scenario Engine
-```bash
-# Run scenario & call-chain verification suite
-python3 scripts/scenario_and_callchain_engine.py --self-test
-```
+---
+
+## 🛠️ Engine Script Cheatsheet
+
+| Script | Primary Command | Key Flags | Role |
+| :--- | :--- | :--- | :--- |
+| **`bootstrap.sh`** | `./scripts/bootstrap.sh` | `--force-first-run` | Verifies skill integrity & discovers runtime environment |
+| **`first_run_preflight.py`** | `python3 scripts/first_run_preflight.py` | `--force`, `--json` | Runs deep 29-item self-test & tool inventory diagnostic |
+| **`fleet_dispatch.py`** | `python3 scripts/fleet_dispatch.py` | `--self-test`, `--detect-only`, `--init-config`, `--validate`, `--dispatch <lane>` | Model-agnostic multi-adapter router with fail-safe cascade |
+| **`scenario_and_callchain_engine.py`** | `python3 scripts/scenario_and_callchain_engine.py` | `--self-test`, `--mode <A/B/C>`, `--trace-dir <dir>` | Anti-bulk-mock sequential oracle & caller graph tracer |
+| **`skill_ambassador_auditor.py`** | `python3 scripts/skill_ambassador_auditor.py` | `--self-test`, `--init-log <dir>`, `--audit-workspace <dir>` | Enforces procedural gates G-01 through G-09 |
+| **`measure_metrics.py`** | `python3 scripts/measure_metrics.py` | `--self-test`, `--notify <Title> <Msg>`, `--json`, `--port <n>` | Telemetry cockpit, notifications & Ponytail analytics |
 
 ---
 
