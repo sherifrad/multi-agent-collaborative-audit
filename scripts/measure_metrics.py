@@ -230,15 +230,16 @@ def scan_related_projects(base_dir: Path) -> list:
                     if git_dir.exists() and item.name not in visited:
                         visited.add(item.name)
                         branch = "main"
-                        try:
-                            b_out = subprocess.check_output(
-                                ["git", "-C", str(item), "branch", "--show-current"],
-                                stderr=subprocess.DEVNULL, text=True
-                            ).strip()
-                            if b_out:
-                                branch = b_out
-                        except Exception:
-                            pass
+                        head_file = git_dir / "HEAD"
+                        if head_file.exists():
+                            try:
+                                head_content = head_file.read_text(encoding="utf-8").strip()
+                                if head_content.startswith("ref: refs/heads/"):
+                                    branch = head_content.replace("ref: refs/heads/", "")
+                                elif len(head_content) == 40:
+                                    branch = head_content[:7]
+                            except Exception:
+                                pass
 
                         has_agents = check_has_governance(item)
                         related.append({
