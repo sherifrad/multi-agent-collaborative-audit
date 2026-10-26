@@ -13,6 +13,7 @@ with exact step-by-step installation and remediation instructions.
 """
 
 import argparse
+import concurrent.futures
 import hashlib
 import json
 import os
@@ -29,7 +30,7 @@ STAMP_FILE = SKILL_ROOT / ".first_run_verified.json"
 
 ENHANCED_PATH = (
     f"{os.environ.get('PATH', '')}:/opt/homebrew/bin:/usr/local/bin:"
-    f"{Path.home() / '.local/bin'}:{Path.home() / 'Library/Android/sdk/platform-tools'}"
+    f"{Path.home() / '.local/bin'}:{Path.home() / '.antigravity/bin'}:{Path.home() / 'Library/Android/sdk/platform-tools'}"
 )
 
 REQUIRED_INTERNAL_FILES = [
@@ -39,8 +40,10 @@ REQUIRED_INTERNAL_FILES = [
     "scripts/measure_metrics.py",
     "scripts/scenario_and_callchain_engine.py",
     "scripts/skill_ambassador_auditor.py",
+    "scripts/lint_samd_invariants.py",
+    "scripts/lint_design_and_ux.py",
     "scripts/fleet_dispatch.py",
-    "references/e2e_and_call_chain_testing.py" if False else "references/e2e_and_call_chain_testing.md",
+    "references/e2e_and_call_chain_testing.md",
     "references/ponytail_ladder.md",
     "references/domain_packs.md",
     "references/ui_ux_mocking.md",
@@ -154,6 +157,8 @@ def compute_skill_fingerprint() -> str:
         SCRIPT_DIR / "measure_metrics.py",
         SCRIPT_DIR / "scenario_and_callchain_engine.py",
         SCRIPT_DIR / "skill_ambassador_auditor.py",
+        SCRIPT_DIR / "lint_samd_invariants.py",
+        SCRIPT_DIR / "lint_design_and_ux.py",
         SCRIPT_DIR / "fleet_dispatch.py",
         SKILL_ROOT / "resources/templates/fleet.template.json",
         SKILL_ROOT / "vendor/delegate-skills/skills/shared_relay.mjs"
@@ -178,42 +183,65 @@ def verify_internal_files() -> List[Dict[str, str]]:
 
 
 def run_internal_script_selftests() -> List[Dict[str, Any]]:
-    results = []
     env = {**os.environ, "PATH": ENHANCED_PATH}
+    tasks = []
 
     py_scripts = [
         ("measure_metrics.py", [sys.executable, str(SCRIPT_DIR / "measure_metrics.py"), "--self-test"]),
         ("scenario_and_callchain_engine.py", [sys.executable, str(SCRIPT_DIR / "scenario_and_callchain_engine.py"), "--self-test"]),
         ("skill_ambassador_auditor.py", [sys.executable, str(SCRIPT_DIR / "skill_ambassador_auditor.py"), "--self-test"]),
+        ("lint_samd_invariants.py", [sys.executable, str(SCRIPT_DIR / "lint_samd_invariants.py"), "--self-test"]),
+        ("lint_design_and_ux.py", [sys.executable, str(SCRIPT_DIR / "lint_design_and_ux.py"), "--self-test"]),
         ("fleet_dispatch.py", [sys.executable, str(SCRIPT_DIR / "fleet_dispatch.py"), "--self-test"]),
     ]
     for name, cmd in py_scripts:
-        proc = subprocess.run(cmd, env=env, capture_output=True, text=True)
-        results.append({
-            "component": f"Python Engine: {name}",
-            "status": "WORKING" if proc.returncode == 0 else "BROKEN",
-            "exit_code": proc.returncode,
-            "remediation": None if proc.returncode == 0 else f"Run `python3 scripts/{name} --self-test` and fix syntax/runtime error: {proc.stderr.strip()}"
+        tasks.append({
+            "type": "python",
+            "name": name,
+            "cmd": cmd
         })
 
     node_bin = shutil.which("node", path=ENHANCED_PATH)
     for relay in ["codex-delegate", "opencode-delegate", "claude-delegate", "agy-delegate"]:
         relay_path = SKILL_ROOT / "vendor" / "delegate-skills" / "skills" / relay / "scripts" / "relay.mjs"
-        if not node_bin:
-            results.append({
-                "component": f"Vendored Relay: {relay}",
-                "status": "BROKEN",
-                "exit_code": 127,
-                "remediation": "Install Node.js (`brew install node`) so vendored .mjs relays can execute."
-            })
-            continue
-        proc = subprocess.run([node_bin, str(relay_path), "--self-test"], env=env, capture_output=True, text=True)
-        results.append({
-            "component": f"Vendored Relay: {relay}",
-            "status": "WORKING" if proc.returncode == 0 else "BROKEN",
-            "exit_code": proc.returncode,
-            "remediation": None if proc.returncode == 0 else f"Fix module import or syntax in {relay_path}: {proc.stderr.strip()}"
+        tasks.append({
+            "type": "node",
+            "name": relay,
+            "node_bin": node_bin,
+            "relay_path": relay_path
         })
+
+    def execute_test(task: Dict[str, Any]) -> Dict[str, Any]:
+        if task["type"] == "python":
+            name = task["name"]
+            proc = subprocess.run(task["cmd"], env=env, capture_output=True, text=True)
+            return {
+                "component": f"Python Engine: {name}",
+                "status": "WORKING" if proc.returncode == 0 else "BROKEN",
+                "exit_code": proc.returncode,
+                "remediation": None if proc.returncode == 0 else f"Run `python3 scripts/{name} --self-test` and fix syntax/runtime error: {proc.stderr.strip()}"
+            }
+        else:
+            relay = task["name"]
+            node_bin = task["node_bin"]
+            relay_path = task["relay_path"]
+            if not node_bin:
+                return {
+                    "component": f"Vendored Relay: {relay}",
+                    "status": "BROKEN",
+                    "exit_code": 127,
+                    "remediation": "Install Node.js (`brew install node`) so vendored .mjs relays can execute."
+                }
+            proc = subprocess.run([node_bin, str(relay_path), "--self-test"], env=env, capture_output=True, text=True)
+            return {
+                "component": f"Vendored Relay: {relay}",
+                "status": "WORKING" if proc.returncode == 0 else "BROKEN",
+                "exit_code": proc.returncode,
+                "remediation": None if proc.returncode == 0 else f"Fix module import or syntax in {relay_path}: {proc.stderr.strip()}"
+            }
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        results = list(executor.map(execute_test, tasks))
 
     return results
 

@@ -1,77 +1,50 @@
-# UI/UX & Graphic Design Mocking Protocol
+# 🎨 Phase 1.5 Visual Mocking & Phase 4.4 Design, Graphic, UI & UX Verification Protocol (`references/ui_ux_mocking.md`)
 
-> **Governing rule for visual feature development, graphic design, and page mocking within the MACA Framework.**
-
----
-
-## 1. Role Definition & Model Strengths
-
-The **UI/UX & Graphic Design Lane** is responsible for all visual ergonomics, screen layouts, design systems, vector assets, and page mockups before backend or logic implementation begins.
-
-### Model Routing Cascade:
-1. **Default / Preferred Model**: **Claude Agent / Claude 3.5 Sonnet**
-   * *Rationale*: Superior spatial awareness, semantic HTML/CSS fidelity, modern typography and color palettes, Jetpack Compose/SwiftUI ergonomics, and WCAG accessibility standards.
-2. **Tier-2 Fallback (Claude Unavailable)**: **Gemini / Antigravity Orchestrator**
-   * *Capabilities*: Leverages native `generative_ui` artifacts, SVG diagramming, and component mockups.
-3. **Tier-3 Fallback (Sandboxed / Offline)**: **Best Available Model / Persona**
-   * *Execution*: Single-file standalone HTML/CSS wireframe with native browser rendering.
+To prevent "blind text-based coding", visual regressions, broken vector graphics, and high-friction clinical UX, MACA v2 enforces a **Two-Stage Design & UX Contract**:
+1. **Stage A — Phase 1.5 Pre-Coding Visual Mock & Approval Gate** (before any UI logic is written).
+2. **Stage B — Phase 4.4 Four-Pillar Design, Graphic, UI & UX Verification Gate** (automated via `python3 scripts/lint_design_and_ux.py` before any task can be marked `[x]`).
 
 ---
 
-## 2. Phase 1.5: The Visual Mocking & User Approval Gate
+## Stage A: Phase 1.5 Pre-Coding Visual Mock Gate
 
-Whenever a feature introduces or modifies user-facing interfaces (Mobile, Web, Desktop, or CLI Dashboards), the fleet must pause before task breakdown:
-
-```
-[ Phase 1: Zero-Presumption Audit & Spec ]
-                    │
-                    ▼
-[ Phase 1.5: UI/UX & Graphic Mock Creation ]  ◄── Claude Agent (Default)
-   • Generates standalone mock: `.agents/mocks/<name>.html` (or SVG/PNG)
-   • Presents visual preview & path to the User
-                    │
-                    ▼
-     ┌─────────────────────────────┐
-     │ 👤 User Review & Gate Check │
-     └──────────────┬──────────────┘
-                    │
-            ┌───────┴───────┐
-       Approved        Revisions Requested
-            │               │
-            │               └──► Return to Phase 1.5 (Tweak Mock)
-            ▼
-[ Phase 2: Task Partitioning & Work Breakdown ]
-   • Attaches approved mock path into `.agents/PLAN_TASKS.md`
-   • Core Logic & Data lanes build to match approved visual contract
-```
-
-> [!IMPORTANT]
-> **No Logic Coding Before Visual Sign-Off**:
-> Core Logic and Data lanes **must not** implement final API routes or state stores until the user explicitly reviews and approves the visual mock. This prevents wasted token expenditure and architectural rework.
+1. **Generate Standalone Visual Artifacts First**:
+   - Before writing production UI code (Jetpack Compose, React/Next.js, Tailwind, SwiftUI, Flutter), the **UI/UX & Graphic Design Lane** (`claude-delegate` or active UI subagent) MUST generate a standalone, interactive `.html` or crisp `.svg` prototype inside `.agents/mocks/<feature_name>.html`.
+   - The prototype must preview both **LTR (English)** and **RTL (Arabic)** layouts, light/dark semantic CSS variables (`--color-surface`, `--color-text`, `--color-alert`), and narrow mobile viewports (`360px` width).
+2. **Mandatory Human Sign-Off**:
+   - Present the mock path and visual summary to the User/Consultant for explicit approval before Phase 2 implementation begins.
 
 ---
 
-## 3. Mock Formats & Ponytail Rules for Design
+## Stage B: The 4 Pillars of Automated Design, Graphic, UI & UX Testing (Phase 4.4)
 
-The Ponytail Minimalism Engine applies to UI mocks:
+Passing unit tests and semantic tree checks (`assertExists()`) is **insufficient** to approve a UI feature. Every UI/UX implementation must pass the four automated pillars enforced by `scripts/lint_design_and_ux.py` and `scripts/scenario_and_callchain_engine.py --geometric-oracle`:
 
-| UI Form Factor | Required Mock Format | Ponytail Principle | Prohibited in Mocks |
-| :--- | :--- | :--- | :--- |
-| **Web Apps / Dashboards** | Standalone Single-File HTML/CSS (in `.agents/mocks/`) | Native CSS Flexbox/Grid, zero external CDN dependencies, instant double-click preview. | Requiring `npm install` or running a webpack dev server just to see a wireframe. |
-| **Mobile (Android / iOS)** | Compose / SwiftUI preview artifact or high-fidelity interactive SVG | Realistic device frame (e.g., 390x844 or 412x915), authentic system bar padding. | Mocking low-res unreadable ascii art when rich HTML/SVG can be rendered. |
-| **Graphic Assets / Icons** | Clean Scalable Vector Graphics (`.svg`) | Scalable, dark-mode adaptive (`currentColor`), crisp path definitions. | Heavy uncompressed bitmaps when vectors are appropriate. |
+### Pillar 1: Graphic, Vector & Design-Token Integrity (`DESIGN-TOKEN` / `SVG` / `RTL-ICON`)
+* **Zero Hardcoded Hex Leaks in UI Components**: Production screens (`*Screen.kt`, `*.tsx`, `*.css`) must never hardcode raw hex literals (`Color(0xFF...)` or `#RRGGBB`) outside designated theme/palette files (`Theme.kt`, `Color.kt`, `tokens.css`). All colors must resolve through semantic tokens (`MaterialTheme.colorScheme.*`) so Dark Mode and High-Contrast clinical themes never break.
+* **Crisp Vector & SVG Geometry**: Every `.svg` file must define an explicit `viewBox="0 0 W H"`, and every Android VectorDrawable (`<vector>`) must define `android:viewportWidth` and `android:viewportHeight` with `currentColor` or semantic tinting.
+* **Arabic RTL Directional Icon Mirroring**: Every directional icon (`arrow`, `chevron`, `back`, `forward`, `send`, `next`, `prev`, `transfer`) must enable `android:autoMirrored="true"` (or CSS `[dir="rtl"] transform: scaleX(-1)`) so navigation flows naturally in Arabic.
 
----
+### Pillar 2: WCAG 2.1 AA Luminance Contrast & Mock-to-Code Visual Fidelity (`WCAG-CONTRAST`)
+* **Mathematical Contrast Verification**: Normal body text and clinical labels must maintain a relative luminance contrast ratio $\ge 4.5:1$ against their surface background ($\ge 3.0:1$ for large $\ge 18\text{pt}$ headers and active controls). Verify token pairs via:
+  ```bash
+  python3 scripts/lint_design_and_ux.py --check-contrast "#0F172A" "#FFFFFF"
+  ```
+* **Mock-to-Code Structural & Visual Diffing**: In Phase 4, compare the rendered screen against the approved `.agents/mocks/<feature>.html` prototype (using Compose screenshot testing / Roborazzi, Playwright `toHaveScreenshot()`, or side-by-side structural token inspection) to confirm zero visual drift.
 
-## 4. Design Artifact Registration
+### Pillar 3: The 5-State UI Stress Matrix (`UI-5-STATES`)
+Every new screen or card component must be explicitly designed and tested across all **Five UI States**:
+1. **`Empty State`**: Clean, informative zero-data view with a clear primary action (never a blank white screen).
+2. **`Loading / Skeleton State`**: Non-blocking shimmer or progress indicator that preserves layout height (`CLS = 0`).
+3. **`Populated (Normal) State`**: Standard clinical/operational data density.
+4. **`Warning / Critical Alert State`**: High-contrast visual escalation (e.g., WHO Labour Care Guide action-line alert badge) with both color and icon/shape cues (colorblind-safe).
+5. **`Extreme Text & Viewport Stress State`**: Tested at **200% OS font scaling** (`fontScale = 2.0f`) and narrow `$320\text{dp}/360\text{dp}$` width with long bilingual Arabic/English strings, asserting via `getUnclippedBoundsInRoot()` that titles keep $\ge 120\text{dp}$ width and zero text clips or overlaps adjacent action icons.
 
-Once a visual mock is approved by the user:
-1. Save the final file to: `.agents/mocks/<feature_slug>_mock.html` (or `.svg`).
-2. Record the path and sign-off in `.agents/SPEC_AND_AUDIT.md`:
-   ```markdown
-   ### Visual Contract & Approved Mock
-   * **Mock File Path**: `.agents/mocks/bedside_entry_v2.html`
-   * **Design Lead**: Claude 3.5 Sonnet (UI Lane)
-   * **User Approval Status**: APPROVED (2026-10-19T07:30:00+03:00)
-   ```
-3. Reference the mock path in each frontend task in `.agents/PLAN_TASKS.md`.
+### Pillar 4: Quantitative UX & Ergonomic Flow Audit (`UX-TAP-BUDGET` & `IME-OCCLUSION`)
+* **Bedside Tap & Time Budget**: High-frequency clinical actions (such as logging an hourly partogram observation or acknowledging an alert) must complete in **$\le 3$ taps** and **$< 15\text{ seconds}$**. Verify via:
+  ```bash
+  python3 scripts/lint_design_and_ux.py --check-ux-budget "Bedside Observation Entry" 3 12.0
+  ```
+* **Touch Target Ergonomics**: Every interactive control must maintain a minimum hit target of **$48\text{dp} \times 48\text{dp}$** (`44px × 44px` on Web).
+* **Zero On-Screen Keyboard (`IME`) Occlusion**: Forms and bottom sheets must apply `WindowInsets.ime` / `imePadding()` so opening the numeric or text keyboard never covers the active input field or the primary `Save` button.
+* **Zero Dead-End Navigation**: Every modal, sheet, or sub-screen must provide a deterministic back/cancel affordance and preserve unsaved clinical input against accidental dismissal.

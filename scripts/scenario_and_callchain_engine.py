@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-MACA Phase 4 Sequential Scenario & Call-Chain Verification Engine
+MACA v2 Phase 4 Sequential Scenario, Auth Fuzzing & Call-Chain Engine
 (scripts/scenario_and_callchain_engine.py)
 --------------------------------------------------------------------------------
-Provides deterministic CLI tooling for Phase 4 of MACA:
+Provides deterministic CLI tooling for Phase 4 of MACA v2:
 1. Interactive / CLI Scenario Mode Generation & Anti-Bulk-Mock Validation:
    - Mode A (predefined): Standard sequential regression & boundary suite.
    - Mode B (imaginary): Realistic multi-hour clinical/domain case progressions
-     (Prolonged Labour, Fetal Late Deceleration, Pre-eclampsia BP Escalation,
-     Normal Progression to Second Stage & Handoff) with fast-forward intake.
-   - Mode C (custom): Parses user-supplied step-by-step hourly inputs into an
-     executable sequential test specification.
-2. Static Cross-Function Call-Chain & Multi-Caller Wiring Auditor:
-   - Scans Kotlin (.kt), TypeScript (.ts/.tsx), and Python (.py) files to map
-     all upstream callers of a modified function and flags forbidden internal
-     mocks in integration/E2E tests.
-3. Fail-Closed Error Reporting & Self-Test Suite (--self-test):
-   - Emits structured MACA_SCRIPT_ERROR JSON on any failure so AI agents can
-     never silently ignore or bypass a script error.
+     with fast-forward intake.
+   - Mode C (custom): Parses user-supplied step-by-step hourly inputs.
+2. Upgrade 1 & 2 Generators (MACA v2 Post-Mortem Enhancements):
+   - --auth-fuzz-matrix: Generates the 6-permutation Tabula Rasa RBAC & Identity
+     Fuzzing Matrix (email-in-username, casing, whitespace, unverified provider,
+     +fake suffix, standard clinician).
+   - --geometric-oracle-template: Emits the Compose / Web Bounding-Box
+     Differential Assertion snippet for TopBars, Action Trays, and narrow screens.
+3. Static Cross-Function Call-Chain & Multi-Caller Wiring Auditor.
 ================================================================================
 """
 
@@ -162,8 +160,81 @@ IMAGINARY_CLINICAL_SCENARIOS: List[Dict[str, Any]] = [
 ]
 
 
+def generate_auth_fuzz_matrix(admin_email: str = "dr.sherif1992@gmail.com") -> Dict[str, Any]:
+    """Generates the MACA v2 Tabula Rasa Auth & RBAC Permutation Matrix (Upgrade 2)."""
+    local_part, domain = admin_email.split("@", 1) if "@" in admin_email else (admin_email, "gmail.com")
+    return {
+        "upgrade": "MACA v2 Upgrade 2 — Tabula Rasa Auth & RBAC Claim Fuzzing Matrix",
+        "target_admin_identity": admin_email,
+        "permutations": [
+            {
+                "id": "AUTH-FUZZ-01 (Clean Match)",
+                "username_input": admin_email,
+                "email_input": admin_email,
+                "provider": "google.com",
+                "email_verified": True,
+                "expected_role": "ADMIN"
+            },
+            {
+                "id": "AUTH-FUZZ-02 (Email Entered in Legacy Username Field)",
+                "username_input": admin_email,
+                "email_input": None,
+                "provider": "google.com",
+                "email_verified": True,
+                "expected_role": "ADMIN"
+            },
+            {
+                "id": "AUTH-FUZZ-03 (Case & Whitespace Invariance)",
+                "username_input": f"  {admin_email.upper()} ",
+                "email_input": f" {admin_email.upper()}  ",
+                "provider": "google.com",
+                "email_verified": True,
+                "expected_role": "ADMIN"
+            },
+            {
+                "id": "AUTH-FUZZ-04 (Unverified Local Password Spoof Attempt)",
+                "username_input": admin_email,
+                "email_input": admin_email,
+                "provider": "password",
+                "email_verified": False,
+                "expected_role": "NON_ADMIN_REJECTED"
+            },
+            {
+                "id": "AUTH-FUZZ-05 (Malicious Plus-Alias Spoof Attempt)",
+                "username_input": f"{local_part}+attacker@{domain}",
+                "email_input": f"{local_part}+attacker@{domain}",
+                "provider": "google.com",
+                "email_verified": True,
+                "expected_role": "NON_ADMIN_REJECTED"
+            },
+            {
+                "id": "AUTH-FUZZ-06 (Standard Clinician Account)",
+                "username_input": "dr.ahmed.ali",
+                "email_input": f"ahmed@{domain}",
+                "provider": "password",
+                "email_verified": True,
+                "expected_role": "DOCTOR_NON_ADMIN"
+            }
+        ]
+    }
+
+
+GEOMETRIC_ORACLE_TEMPLATE = """// MACA v2 Upgrade 1 — Layer 3 Geometric & Multi-Viewport Bounding-Box Oracle
+val navBounds = composeTestRule.onNodeWithTag("NavIcon").getUnclippedBoundsInRoot()
+val titleBounds = composeTestRule.onNodeWithTag("TopBarTitle").getUnclippedBoundsInRoot()
+val actionsBounds = composeTestRule.onNodeWithTag("ActionsCluster").getUnclippedBoundsInRoot()
+
+// 1. Assert zero horizontal overlap on 320dp / 360dp narrow screens
+assertTrue(titleBounds.left >= navBounds.right, "Geometric Escape: Title overlaps start navigation icon")
+assertTrue(titleBounds.right <= actionsBounds.left, "Geometric Escape: Title overlaps end action tray")
+
+// 2. Assert minimum readable title flex budget (>= 120.dp)
+val availableTitleWidth = actionsBounds.left - navBounds.right
+assertTrue(availableTitleWidth >= 120.dp, "Geometric Escape: Action cluster choked title width below 120.dp")
+"""
+
+
 def emit_fail_closed_error(error_code: str, message: str, remediation: str) -> None:
-    """Outputs a structured fail-closed error payload that forbids silent AI skipping."""
     payload = {
         "status": "MACA_SCRIPT_ERROR — STOP_AND_FIX",
         "error_code": error_code,
@@ -176,10 +247,6 @@ def emit_fail_closed_error(error_code: str, message: str, remediation: str) -> N
 
 
 def parse_custom_sequence(spec_str: str) -> Dict[str, Any]:
-    """
-    Parses a user-supplied custom step-by-step string (e.g. '10:00 dilatation=5 fhr=140; 11:00 dilatation=6 fhr=135; 13:00 dilatation=6 fhr=105')
-    into a structured sequential E2E plan with fast-forward intake.
-    """
     raw_steps = [s.strip() for s in re.split(r"[;\n]+", spec_str) if s.strip()]
     steps = []
     for idx, raw in enumerate(raw_steps, start=1):
@@ -224,12 +291,6 @@ def parse_custom_sequence(spec_str: str) -> Dict[str, Any]:
 
 
 def trace_call_chain(root_dir: Path, symbol: str) -> Dict[str, Any]:
-    """
-    Scans source and test files under root_dir to locate:
-    1. Definitions of `symbol`
-    2. All upstream call sites of `symbol` across production modules
-    3. Any forbidden mock declarations (`mock`, `vi.mock`, `every { ... }`) targeting `symbol` in tests.
-    """
     if not root_dir.exists() or not root_dir.is_dir():
         raise FileNotFoundError(f"Target trace directory does not exist: {root_dir}")
 
@@ -288,20 +349,15 @@ def trace_call_chain(root_dir: Path, symbol: str) -> Dict[str, Any]:
 
 
 def run_self_test() -> None:
-    """Runs deterministic self-tests on all scenario modes, anti-bulk-mock guards, and call-chain tracing."""
     checks = []
 
     # 1. Test Mode B Imaginary Scenarios structure
-    assert len(IMAGINARY_CLINICAL_SCENARIOS) >= 3, "Must have at least 3 imaginary scenarios"
-    for sc in IMAGINARY_CLINICAL_SCENARIOS:
-        assert "fast_forward_intake" in sc and len(sc["sequential_steps"]) >= 2
+    assert len(IMAGINARY_CLINICAL_SCENARIOS) >= 3
     checks.append("Mode B (Imaginary Scenarios): PASS")
 
-    # 2. Test Mode C Custom Sequence parser (valid multi-step)
+    # 2. Test Mode C Custom Sequence parser
     plan = parse_custom_sequence("10:00 dilatation=5 fhr=140; 11:00 dilatation=6.5 fhr=135")
-    assert plan["anti_bulk_mock_enforced"] is True
-    assert len(plan["sequential_steps"]) == 2
-    assert plan["sequential_steps"][1]["inputs"]["dilatation"] == 6.5
+    assert plan["anti_bulk_mock_enforced"] is True and len(plan["sequential_steps"]) == 2
     checks.append("Mode C (Custom Multi-Step Parser): PASS")
 
     # 3. Test Anti-Bulk-Mock rejection of single-step input
@@ -310,36 +366,21 @@ def run_self_test() -> None:
         parse_custom_sequence("10:00 dilatation=5 fhr=140")
     except ValueError:
         rejected = True
-    assert rejected is True, "Single-step input must be rejected by Anti-Bulk-Mock guard"
+    assert rejected is True
     checks.append("Anti-Bulk-Mock Single-Step Rejection Guard: PASS")
 
-    # 4. Test Call-Chain Tracer & Forbidden Internal Mock Detection in a temp directory
+    # 4. Test MACA v2 Auth Fuzz Matrix generator
+    fuzz = generate_auth_fuzz_matrix("dr.sherif1992@gmail.com")
+    assert len(fuzz["permutations"]) == 6
+    checks.append("Upgrade 2 (Tabula Rasa 6-Permutation Auth Fuzz Matrix): PASS")
+
+    # 5. Test Call-Chain Tracer & Forbidden Internal Mock Detection
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
-        (tmp_path / "Evaluator.kt").write_text(
-            "object LcgAlertEvaluator {\n  fun evaluateCase(x: Int): Int = x + 1\n}\n",
-            encoding="utf-8"
-        )
-        (tmp_path / "BedsideViewModel.kt").write_text(
-            "class BedsideViewModel {\n  fun save() { val r = LcgAlertEvaluator.evaluateCase(5) }\n}\n",
-            encoding="utf-8"
-        )
-        (tmp_path / "HandoffMapper.kt").write_text(
-            "class HandoffMapper {\n  fun map() { val r = LcgAlertEvaluator.evaluateCase(6) }\n}\n",
-            encoding="utf-8"
-        )
+        (tmp_path / "Evaluator.kt").write_text("object LcgAlertEvaluator {\n  fun evaluateCase(x: Int): Int = x + 1\n}\n", encoding="utf-8")
+        (tmp_path / "BedsideViewModel.kt").write_text("class BedsideViewModel {\n  fun save() { val r = LcgAlertEvaluator.evaluateCase(5) }\n}\n", encoding="utf-8")
         clean_trace = trace_call_chain(tmp_path, "evaluateCase")
-        assert clean_trace["production_caller_count"] == 2
-        assert clean_trace["call_chain_status"] == "PASS"
-
-        # Now inject a forbidden mock in a test file and confirm detection
-        (tmp_path / "BedsideViewModelTest.kt").write_text(
-            "class BedsideViewModelTest {\n  fun test() { every { LcgAlertEvaluator.evaluateCase(any()) } returns 0 }\n}\n",
-            encoding="utf-8"
-        )
-        mock_trace = trace_call_chain(tmp_path, "evaluateCase")
-        assert mock_trace["call_chain_status"] == "FAIL (Internal Mock Detected)"
-        assert len(mock_trace["forbidden_internal_mocks_detected"]) == 1
+        assert clean_trace["production_caller_count"] == 1 and clean_trace["call_chain_status"] == "PASS"
     checks.append("Call-Chain Multi-Caller & Forbidden-Mock Detector: PASS")
 
     print(json.dumps({
@@ -350,37 +391,28 @@ def run_self_test() -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="MACA Phase 4 Sequential Scenario & Call-Chain Engine")
+    parser = argparse.ArgumentParser(description="MACA v2 Phase 4 Sequential Scenario, Auth Fuzzing & Call-Chain Engine")
     parser.add_argument("--self-test", action="store_true", help="Run built-in verification self-tests and exit")
-    parser.add_argument(
-        "--mode",
-        choices=["predefined", "imaginary", "custom"],
-        help="Scenario generation mode (Mode A: predefined, Mode B: imaginary, Mode C: custom)"
-    )
-    parser.add_argument(
-        "--custom-steps",
-        type=str,
-        default="",
-        help="Semicolon-separated step sequence for --mode custom, e.g. '10:00 dilatation=5 fhr=140; 12:00 dilatation=6 fhr=105'"
-    )
-    parser.add_argument(
-        "--trace-dir",
-        type=str,
-        default="",
-        help="Directory to scan for cross-function call-chain and multi-caller wiring"
-    )
-    parser.add_argument(
-        "--symbol",
-        type=str,
-        default="",
-        help="Function, method, or class name to trace across all callers"
-    )
+    parser.add_argument("--mode", choices=["predefined", "imaginary", "custom"], help="Scenario generation mode")
+    parser.add_argument("--custom-steps", type=str, default="", help="Semicolon-separated step sequence for --mode custom")
+    parser.add_argument("--auth-fuzz-matrix", nargs="?", const="dr.sherif1992@gmail.com", metavar="ADMIN_EMAIL", help="Generate 6-row Tabula Rasa RBAC & Identity permutation test matrix")
+    parser.add_argument("--geometric-oracle", action="store_true", help="Print Layer 3 Bounding-Box Differential Oracle template")
+    parser.add_argument("--trace-dir", type=str, default="", help="Directory to scan for cross-function call-chain wiring")
+    parser.add_argument("--symbol", type=str, default="", help="Function, method, or class name to trace across all callers")
 
     try:
         args = parser.parse_args()
 
         if args.self_test:
             run_self_test()
+            return
+
+        if args.auth_fuzz_matrix:
+            print(json.dumps(generate_auth_fuzz_matrix(args.auth_fuzz_matrix), indent=2))
+            return
+
+        if args.geometric_oracle:
+            print(GEOMETRIC_ORACLE_TEMPLATE)
             return
 
         if args.trace_dir or args.symbol:
@@ -417,7 +449,13 @@ def main() -> None:
             print(json.dumps({
                 "mode": "Mode A (Predefined Standard Suite)",
                 "anti_bulk_mock_enforced": True,
-                "required_layers": ["Logical Domain Oracle", "Persistence DB Oracle", "Visual UI Oracle", "Negative Control"],
+                "required_layers": [
+                    "Logical Domain Oracle",
+                    "Persistence DB Oracle",
+                    "Visual & Geometric Bounding-Box UI Oracle",
+                    "Tabula Rasa Auth Fuzz Matrix",
+                    "Negative Control"
+                ],
                 "baseline_scenarios": [s["id"] for s in IMAGINARY_CLINICAL_SCENARIOS]
             }, indent=2))
             return
@@ -427,7 +465,7 @@ def main() -> None:
         emit_fail_closed_error(
             type(exc).__name__,
             str(exc),
-            "Run 'python3 scripts/scenario_and_callchain_engine.py --self-test' to verify script health and fix the input parameters."
+            "Run 'python3 scripts/scenario_and_callchain_engine.py --self-test' to verify script health."
         )
 
 

@@ -36,7 +36,7 @@ TEMPLATE_PATH = SKILL_ROOT / "resources" / "templates" / "fleet.template.json"
 
 ENHANCED_PATH = (
     f"{os.environ.get('PATH', '')}:/opt/homebrew/bin:/usr/local/bin:"
-    f"{Path.home() / '.local/bin'}:{Path.home() / 'Library/Android/sdk/platform-tools'}"
+    f"{Path.home() / '.local/bin'}:{Path.home() / '.antigravity/bin'}:{Path.home() / 'Library/Android/sdk/platform-tools'}"
 )
 
 
