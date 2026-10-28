@@ -117,6 +117,35 @@ def scan_file_for_invariants(file_path: Path, rel_path: str) -> Dict[str, List[D
                         )
                     })
 
+    # 2b. Generic RBAC heuristic for Python/JS/Java style code: an admin decision that compares a
+    # username/email against a constant. A comment mentioning email_verified must not count as a guard,
+    # so require it to appear in an actual condition.
+    if not is_test_file and file_path.suffix in {".py", ".js", ".jsx", ".java", ".ts", ".tsx", ".kt"}:
+        generic_pattern = re.compile(
+            r"[\"']?(username|email)[\"']?\]?\)?\s*==\s*(ADMIN\w*|[A-Z_]*ADMIN[A-Z_]*|[\"'][^\"']+@[^\"']+[\"'])"
+        )
+        verified_in_condition = re.compile(
+            r"(email_verified|emailVerified)[\"'\]\)]*\s*(is\s+True|===?\s*(True|true))|\bis_?[Vv]erified\("
+        )
+        for idx, line in enumerate(lines, start=1):
+            code = line.split("#", 1)[0] if file_path.suffix == ".py" else line
+            if generic_pattern.search(code):
+                start_w = max(0, idx - 4)
+                end_w = min(len(lines), idx + 4)
+                window_code = "\n".join(
+                    (l.split("#", 1)[0] if file_path.suffix == ".py" else l) for l in lines[start_w:end_w]
+                )
+                if not verified_in_condition.search(window_code) and "FirebaseAuthBridge" not in window_code:
+                    blockers.append({
+                        "rule": "RBAC-STRING-HEURISTIC (Defect D-2)",
+                        "location": f"{rel_path}:{idx}",
+                        "line": line.strip(),
+                        "remediation": (
+                            "Admin rights decided by username/email string equality alone can be spoofed. "
+                            "Require a verified identity claim (email_verified is True AND a trusted provider)."
+                        )
+                    })
+
     # 3. Check Constructor / Function Parameter Budgeting (JVM 255-word limit guard)
     if file_path.suffix in {".kt", ".ts", ".tsx"}:
         decl_pattern = re.compile(r"\b(data\s+class|class|fun|function)\s+([A-Za-z0-9_]+)\s*\(")
@@ -189,8 +218,8 @@ def scan_directory(root_dir: Path) -> Dict[str, Any]:
     if not root_dir.exists() or not root_dir.is_dir():
         raise FileNotFoundError(f"Scan directory does not exist: {root_dir}")
 
-    exts = {".kt", ".ts", ".tsx", ".sql"}
-    ignored = {"node_modules", ".git", "build", "dist", ".gradle", "__pycache__", "vendor"}
+    exts = {".kt", ".ts", ".tsx", ".sql", ".py", ".java", ".js", ".jsx"}
+    ignored = {"node_modules", ".git", "build", "dist", ".gradle", "__pycache__", "vendor", ".agents"}
 
     all_blockers: List[Dict[str, Any]] = []
     all_warnings: List[Dict[str, Any]] = []
@@ -207,8 +236,14 @@ def scan_directory(root_dir: Path) -> Dict[str, Any]:
         all_blockers.extend(res["blockers"])
         all_warnings.extend(res["warnings"])
 
+    if files_scanned == 0:
+        status = "NOT_APPLICABLE_NO_SOURCE_FILES"
+    else:
+        status = "PASS" if len(all_blockers) == 0 else "FAIL_HARD_BLOCKERS"
     return {
-        "linter_status": "PASS" if len(all_blockers) == 0 else "FAIL_HARD_BLOCKERS",
+        "linter_status": status,
+        "note": ("0 source files scanned: this result is NOT evidence of safety. Point --scan-dir at the code."
+                 if files_scanned == 0 else ""),
         "files_scanned": files_scanned,
         "hard_blockers_count": len(all_blockers),
         "warnings_count": len(all_warnings),
@@ -282,7 +317,7 @@ def main() -> None:
         if args.scan_dir:
             report = scan_directory(Path(args.scan_dir).resolve())
             print(json.dumps(report, indent=2))
-            sys.exit(0 if report["linter_status"] == "PASS" else 1)
+            sys.exit(0 if report["linter_status"] in ("PASS", "NOT_APPLICABLE_NO_SOURCE_FILES") else 1)
         parser.print_help()
     except Exception as exc:
         emit_fail_closed_error(

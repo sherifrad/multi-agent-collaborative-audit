@@ -176,12 +176,12 @@ def generate_auth_fuzz_matrix(admin_email: str = "dr.sherif1992@gmail.com") -> D
                 "expected_role": "ADMIN"
             },
             {
-                "id": "AUTH-FUZZ-02 (Email Entered in Legacy Username Field)",
+                "id": "AUTH-FUZZ-02 (Email Entered in Username Field Only, No Email Claim)",
                 "username_input": admin_email,
                 "email_input": None,
                 "provider": "google.com",
                 "email_verified": True,
-                "expected_role": "ADMIN"
+                "expected_role": "NON_ADMIN_REJECTED"  # username is attacker-chosen at signup; only a verified email claim may grant admin
             },
             {
                 "id": "AUTH-FUZZ-03 (Case & Whitespace Invariance)",

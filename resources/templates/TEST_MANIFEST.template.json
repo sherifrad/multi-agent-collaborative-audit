@@ -1,0 +1,34 @@
+{
+  "_comment": "Copy to <workspace>/.agents/TEST_MANIFEST.json. One entry per test. deps = globs of every file whose change could alter the result (the code under test, its callers, fixtures, the test itself). Use `impact_and_cache.py deps-suggest --root . --symbol <fn>` to find callers.",
+  "tests": [
+    {
+      "id": "UNIT-rule-boundaries",
+      "tier": 1,
+      "cmd": "./gradlew :core:test --tests '*RuleBoundaryTest'",
+      "deps": ["core/src/**/Mgso4Rule*.kt", "core/src/test/**/RuleBoundaryTest.kt"],
+      "always": true,
+      "covers": ["ORACLE-1", "ORACLE-2"]
+    },
+    {
+      "id": "INT-caller-bedside-entry",
+      "tier": 2,
+      "cmd": "./gradlew :app:testDebugUnitTest --tests '*BedsideEntryFlowTest'",
+      "deps": ["core/src/**/Mgso4Rule*.kt", "app/src/**/BedsideEntry*.kt", "app/src/test/**/BedsideEntryFlowTest.kt"],
+      "covers": ["ORACLE-3"]
+    },
+    {
+      "id": "E2E-sequential-resp-decline",
+      "tier": 3,
+      "cmd": "./gradlew :app:connectedDebugAndroidTest --tests '*RespDeclineScenario'",
+      "deps": ["core/src/**/*.kt", "app/src/**/*.kt", "app/src/androidTest/**/RespDeclineScenario.kt"],
+      "covers": ["ORACLE-1", "ORACLE-4"]
+    },
+    {
+      "id": "DEEP-full-replay",
+      "tier": 4,
+      "cmd": "./gradlew connectedCheck",
+      "deps": ["**/*.kt"],
+      "covers": ["release-gate"]
+    }
+  ]
+}
