@@ -219,7 +219,14 @@ def audit_workspace_compliance(workspace_dir: Path, require_ui_mock: bool = True
 
     if "samd" in linter_results:
         proc = linter_results["samd"]
-        if proc.returncode == 0:
+        if proc.returncode == 0 and "NOT_APPLICABLE_NO_SOURCE_FILES" in proc.stdout:
+            passed_gates += 1
+            findings.append({
+                "gate": "G-07 (SaMD Zero-Delete, RBAC & JVM Budget Linter)",
+                "status": "PASS (N/A: 0 source files scanned - not evidence)",
+                "detail": "Linter found no source files under the workspace. Counted as not applicable, never as proof."
+            })
+        elif proc.returncode == 0:
             passed_gates += 1
             findings.append({
                 "gate": "G-07 (SaMD Zero-Delete, RBAC & JVM Budget Linter)",
