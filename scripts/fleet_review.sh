@@ -15,11 +15,11 @@ while [ $# -gt 0 ]; do case "$1" in
   *) echo "unknown arg $1"; exit 2;; esac; done
 bin_of() { case "$1" in opencode) echo opencode;; codex) echo codex;; gemini) echo gemini;; agy) echo agy;; claude) echo claude;; *) echo "";; esac; }
 echo "== Fleet detection (vendors found on PATH) =="
-for v in opencode codex gemini agy claude; do
+for v in opencode codex agy claude; do
   p="$(command -v "$v" 2>/dev/null)"; printf '  %-9s %s\n' "$v" "${p:-MISSING}"; done
 [ "$MODE" = detect ] && exit 0
 if [ "$MODE" = self ]; then
-  for v in opencode codex gemini agy claude; do
+  for v in opencode codex agy claude; do
     node "$RELAYS/$v-delegate/scripts/relay.mjs" --help >/dev/null 2>&1 && echo "relay $v: OK" || { echo "relay $v: FAIL"; exit 1; }
   done; exit 0; fi
 [ -n "$BRIEF" ] && [ ${#LANES[@]} -gt 0 ] || { echo "need --brief and at least one --lane"; exit 2; }
