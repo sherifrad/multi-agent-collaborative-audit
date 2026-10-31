@@ -20,7 +20,7 @@ for v in opencode codex gemini agy claude; do
 [ "$MODE" = detect ] && exit 0
 if [ "$MODE" = self ]; then
   for v in opencode codex gemini agy claude; do
-    node "$RELAYS/$v-delegate/scripts/relay.mjs" --self-test >/dev/null 2>&1 && echo "relay $v: OK" || { echo "relay $v: FAIL"; exit 1; }
+    node "$RELAYS/$v-delegate/scripts/relay.mjs" --help >/dev/null 2>&1 && echo "relay $v: OK" || { echo "relay $v: FAIL"; exit 1; }
   done; exit 0; fi
 [ -n "$BRIEF" ] && [ ${#LANES[@]} -gt 0 ] || { echo "need --brief and at least one --lane"; exit 2; }
 OUT="${OUT:-$REPO/.agents/fleet-runs/$(date +%Y%m%d-%H%M%S)}"; mkdir -p "$OUT"
@@ -29,7 +29,7 @@ for lane in "${LANES[@]}"; do
   label="$(echo "$lane" | tr '/: ' '___')"
   if ! command -v "$v" >/dev/null 2>&1; then echo "[$lane] SKIPPED: $v not installed"; echo "{\"lane\":\"$lane\",\"status\":\"missing\"}" > "$OUT/$label.result.json"; continue; fi
   echo "[$lane] running (read-only, up to 5 min)..."
-  args=(--brief "$BRIEF" --cd "$REPO" --read-only --out-dir "$OUT/$label"); [ -n "$m" ] && args+=(--model "$m")
+  args=(--brief "$BRIEF" --cd "$REPO" --read-only --out-dir "$OUT/$label"); [ "$v" != gemini ] && args+=(--timeout 10m); [ -n "$m" ] && args+=(--model "$m")
   node "$RELAYS/$v-delegate/scripts/relay.mjs" "${args[@]}" >/dev/null 2>"$OUT/$label.stderr"
 done
 python3 - "$OUT" <<'PY'
@@ -37,7 +37,7 @@ import json,glob,os,sys
 out=sys.argv[1]; print("\n== Fleet result table ==")
 print(f"{'lane':34} {'status':22} {'exit':5} {'files changed':13} {'chars'}")
 for d in sorted(glob.glob(out+"/*/result.json")):
-    r=json.load(open(d)); lane=os.path.basename(os.path.dirname(d)); sp=os.path.join(os.path.dirname(d),"stdout.txt"); msg=(open(sp).read().strip() if os.path.exists(sp) else (r.get("finalMessage","") or ""))
+    r=json.load(open(d)); lane=os.path.basename(os.path.dirname(d)); sp=r.get("finalPath") or ""; msg=(open(sp).read().strip() if sp and os.path.exists(sp) else (r.get("finalMessage","") or ""))
     if r.get("status")!="completed": msg=msg or ("FAILED: "+str(r.get("stderrTail",""))[-400:])
     open(os.path.join(out,lane+".md"),"w").write(msg)
     print(f"{lane:34} {str(r.get('status')):22} {str(r.get('exitCode')):5} {len(r.get('touchedFiles',[])):<13} {len(msg)}")

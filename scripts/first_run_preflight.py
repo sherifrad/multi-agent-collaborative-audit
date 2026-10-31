@@ -73,11 +73,9 @@ REQUIRED_INTERNAL_FILES = [
     "resources/templates/SPEC_AND_AUDIT.template.md",
     "resources/templates/MACA_TOURNAMENT_LEADERBOARD.template.md",
     "resources/templates/fleet.template.json",
-    "vendor/delegate-skills/skills/shared_relay.mjs",
     "vendor/delegate-skills/skills/codex-delegate/SKILL.md",
     "vendor/delegate-skills/skills/codex-delegate/scripts/relay.mjs",
-    "vendor/delegate-skills/skills/gemini-delegate/SKILL.md",
-    "vendor/delegate-skills/skills/gemini-delegate/scripts/relay.mjs",
+    "vendor/delegate-skills/VENDOR.md",
     "scripts/fleet_review.sh",
     "vendor/delegate-skills/skills/opencode-delegate/SKILL.md",
     "vendor/delegate-skills/skills/opencode-delegate/scripts/relay.mjs",
@@ -186,7 +184,7 @@ def compute_skill_fingerprint() -> str:
         SCRIPT_DIR / "harness.py",
         SKILL_ROOT / "resources/templates/PROJECT_PROFILE.template.md",
         SKILL_ROOT / "resources/templates/fleet.template.json",
-        SKILL_ROOT / "vendor/delegate-skills/skills/shared_relay.mjs"
+        SKILL_ROOT / "vendor/delegate-skills/VENDOR.md"
     ]
     for p in watched:
         if p.exists():
@@ -230,7 +228,7 @@ def run_internal_script_selftests() -> List[Dict[str, Any]]:
         })
 
     node_bin = shutil.which("node", path=ENHANCED_PATH)
-    for relay in ["codex-delegate", "opencode-delegate", "claude-delegate", "agy-delegate", "gemini-delegate"]:
+    for relay in ["codex-delegate", "opencode-delegate", "claude-delegate", "agy-delegate"]:
         relay_path = SKILL_ROOT / "vendor" / "delegate-skills" / "skills" / relay / "scripts" / "relay.mjs"
         tasks.append({
             "type": "node",
@@ -260,7 +258,7 @@ def run_internal_script_selftests() -> List[Dict[str, Any]]:
                     "exit_code": 127,
                     "remediation": "Install Node.js (`brew install node`) so vendored .mjs relays can execute."
                 }
-            proc = subprocess.run([node_bin, str(relay_path), "--self-test"], env=env, capture_output=True, text=True)
+            proc = subprocess.run([node_bin, str(relay_path), "--help"], env=env, capture_output=True, text=True)
             return {
                 "component": f"Vendored Relay: {relay}",
                 "status": "WORKING" if proc.returncode == 0 else "BROKEN",

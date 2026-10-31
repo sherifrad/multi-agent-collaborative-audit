@@ -91,10 +91,14 @@ a blocker. Say in the report which roles were merged and why.
 
 ## 3. Dispatch tiers (use the highest available, degrade gracefully)
 
-1. **External CLIs** via vendored relays (`vendor/delegate-skills/skills/<agent>-delegate/scripts/relay.mjs
-   --brief <file> --cd <repo>`; agents: opencode, codex, gemini, agy, claude; or all at once with
-   `scripts/fleet_review.sh`), configured in `.agents/fleet.json`. Different models give the most
-   independent review.
+1. **External CLIs** through the upstream delegate skills, vendored unmodified in `vendor/delegate-skills/`
+   (source and pinned commit in its `VENDOR.md`; agents: opencode, codex, agy, claude). Do not write your own
+   dispatch code. Follow each skill's loop: write a self-contained brief, run
+   `node vendor/delegate-skills/skills/<agent>-delegate/scripts/relay.mjs --brief <file> --cd <repo>`
+   (add `--read-only` for review), read `result.json`, re-run the gates yourself, then you commit. Several
+   lanes at once: `scripts/fleet_review.sh`; lane config: `.agents/fleet.json`. Refresh the vendored copy from
+   the official repo (`amElnagdy/delegate-skills`) before a run that depends on it. Different models give the
+   most independent review.
 2. **Platform subagents**, one per role, each with a clean context.
 3. **Fresh-process fallback**: `claude -p` (or similar) per role with restricted inputs.
 

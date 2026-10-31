@@ -66,10 +66,11 @@ log = []
 for i, spec in enumerate(s for s in a.chain.split(",") if s):
     cli, _, model = spec.partition(":")
     adir = out / f"attempt-{i}-{cli}-{model.replace('/', '_')}"
-    cmd = ["node", str(SK / f"{cli}-delegate/scripts/relay.mjs"), "--brief", a.brief, "--cd", a.cd, "--out-dir", str(adir)]
+    cmd = ["node", str(SK / f"{cli}-delegate/scripts/relay.mjs"), "--brief", a.brief, "--cd", a.cd, "--out-dir", str(adir), ]
+    if cli != "gemini": cmd += ["--timeout", f"{max(60, int(a.timeout_ms) // 1000)}s"]
     if model and cli != "claude": cmd += ["--model", model]
     if a.read_only: cmd.append("--read-only")
-    env = dict(os.environ, MACA_RELAY_TIMEOUT_MS=str(a.timeout_ms))
+    env = dict(os.environ)
     if cli == "claude" and model: env["ANTHROPIC_MODEL"] = model   # claude relay drops --model
     before_state = tree_state(a.cd)
     t = time.time()
