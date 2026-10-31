@@ -24,11 +24,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 from skill_ambassador_auditor import profile_field, read  # noqa: E402
 import fleet_select  # noqa: E402
+import project_map  # noqa: E402
 
 TIERS = ["light", "standard", "frontier"]
 EFFORTS = ["low", "medium", "high"]
 JUDGING = {"builder", "test-designer", "reviewer", "second-reviewer"}
-SENSITIVE = re.compile(r"\b(auth\w*|token|secret|password|passwd|crypto\w*|payment|charge|refund|balance|invoice|migrat\w+|drop\s+table|permission\w*|session|jwt|exec|eval)\b", re.I)
+SENSITIVE = re.compile(r"\b(auth\w*|token|secret|password|passwd|crypto\w*|payment|charge|refund|balance|invoice|migrat\w+|drop\s+table|permission\w*|session|jwt|exec|eval|alter\s+table|create\s+table|api[_ ]?key|private_key|client_secret)\b", re.I)
 RISKY_FILES = ("migrations/", "migration", "schema", ".github/workflows/", "package-lock.json", "yarn.lock", "poetry.lock", "Cargo.lock", "go.sum", "Dockerfile", "permissions", "rbac")
 CODE_EXT = (".py", ".js", ".ts", ".tsx", ".jsx", ".kt", ".java", ".go", ".rs", ".swift", ".rb", ".php", ".c", ".cc", ".cpp", ".cs", ".sql")
 
@@ -97,7 +98,7 @@ def risk_from_diff(diff: str, numstat: str, risk_paths: List[str]) -> Dict[str, 
     if removed_tests > added_tests: reasons.append("tests were removed or weakened")
     cls = "high" if reasons else "medium" if len(files) >= 4 or added >= 150 else "low"
     if cls == "medium": reasons.append(f"{len(files)} files, {added} lines added")
-    return {"class": cls, "files": len(files), "lines_added": added, "reasons": reasons}
+    return {"class": cls, "files": len(files), "lines_added": added, "reasons": reasons, "paths": files}
 
 
 def measure_risk(cwd: Path, risk_paths: List[str]) -> Dict[str, Any]:
@@ -108,6 +109,40 @@ def measure_risk(cwd: Path, risk_paths: List[str]) -> Dict[str, Any]:
     return r
 
 
+# ------------------------------------------------------------------ task kind + criticality
+KIND_CRIT = {"docs-only": 0, "tests-only": 1, "config": 1, "code": 2, "schema": 3, "security": 3, "money": 3}
+CRIT_CLASS = {0: "docs", 1: "low", 2: "medium", 3: "high"}
+
+
+def effective_criticality(risk: Dict[str, Any], pmap: Optional[Dict[str, Any]], risk_paths: List[str],
+                          declared_kind: str = "", planned: Optional[List[str]] = None) -> Dict[str, Any]:
+    """max(task kind, project map, diff risk). Kind is inferred from the changed paths and diff; a kind declared by the
+    orchestrator or an agent can only raise it. The diff content always wins over a name or a label."""
+    paths = sorted(set(risk.get("paths", [])) | set(planned or []))
+    by_name = [project_map.classify_path(p) for p in paths]
+    sensitive = any("sensitive" in r for r in risk.get("reasons", []))
+    if not paths:
+        kind, kind_crit = "unknown", 1
+    elif all(a["crit"] == 0 for a in by_name) and not sensitive and risk["class"] == "low":
+        kind, kind_crit = "docs-only", 0
+    elif all(a["aspect"] == "tests" for a in by_name) and risk["class"] == "low":
+        kind, kind_crit = "tests-only", 1
+    elif any(a["crit"] == 3 for a in by_name):
+        kind, kind_crit = "sensitive", 3
+    else:
+        kind, kind_crit = "code", 2
+    declared = KIND_CRIT.get(declared_kind, 0)
+    if pmap:
+        map_crit = max(project_map.lookup(pmap, paths, risk_paths).values(), default=0)
+    else:   # never scanned: judge by name with the scanner's own rules
+        map_crit = max([a["crit"] for a in by_name] + [3 if any(fnmatch.fnmatch(p, g) for g in risk_paths for p in paths) else 0])
+    diff_crit = {"high": 3, "medium": 2}.get(risk["class"], 0)
+    parts = {"kind": max(kind_crit, declared), "map": map_crit, "diff": diff_crit}
+    level = max(parts.values()) if paths else max(1, declared, diff_crit)
+    return {"level": level, "class": CRIT_CLASS[level], "kind": kind, "declared_kind": declared_kind or None, "parts": parts,
+            "map": "PROJECT_MAP.json" if pmap else "not scanned: path names only"}
+
+
 # ------------------------------------------------------------------ routing
 def wanted(role: str, risk: str, failures: int, blockers: int, full_path: bool) -> Dict[str, str]:
     """Return {tier, effort, why} using only measured inputs."""
@@ -116,6 +151,8 @@ def wanted(role: str, risk: str, failures: int, blockers: int, full_path: bool) 
     base = {"builder": ("standard", "medium"), "test-designer": ("standard", "medium"),
             "reviewer": ("standard", "medium"), "second-reviewer": ("standard", "high")}[role]
     tier, effort, why = base[0], base[1], [f"{role} baseline"]
+    if risk == "docs" and role != "second-reviewer":
+        effort = "low"; why.append("documentation-only change")
     if risk == "medium":
         effort = "high" if role in ("reviewer", "second-reviewer", "test-designer") else effort; why.append("medium risk")
     if risk == "high" or (full_path and role in ("reviewer", "second-reviewer")):
@@ -178,7 +215,10 @@ def budget_state(profile: str, used: Dict[str, int]) -> Dict[str, Any]:
 def route(role: str, cwd: Path, signals: Dict[str, Any], discover: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     profile = read(cwd / ".agents" / "PROJECT_PROFILE.md")
     risk_paths = [p.strip() for p in re.split(r"[,;]", profile_field(profile, "Risk paths") or "") if p.strip() and "inferred" not in p.lower()]
-    risk = signals.get("risk") or measure_risk(cwd, risk_paths)
+    diff_risk = signals.get("risk") or measure_risk(cwd, risk_paths)
+    crit = effective_criticality(diff_risk, project_map.load_map(cwd), risk_paths, signals.get("kind", ""), signals.get("paths"))
+    risk = dict(diff_risk, diff_class=diff_risk["class"], criticality=crit)
+    risk["class"] = crit["class"]
     want = wanted(role, risk["class"], signals.get("failures", 0), signals.get("blockers", 0), signals.get("full_path", False))
     plan = fleet_select.build_plan(discover, {}, profile)
     available = {k: v["family"] for k, v in plan["usable_external"].items()}
@@ -206,7 +246,7 @@ def route(role: str, cwd: Path, signals: Dict[str, Any], discover: Optional[Dict
 def log_decision(cwd: Path, d: Dict[str, Any]) -> None:
     (cwd / ".agents").mkdir(exist_ok=True)
     with open(cwd / ".agents" / "ROUTING_LOG.jsonl", "a", encoding="utf-8") as f:
-        f.write(json.dumps({k: d[k] for k in ("ts", "role", "want", "stop")} | {"risk": d["risk"]["class"], "choice": (d["choice"] or {}).get("model")}) + "\n")
+        f.write(json.dumps({k: d[k] for k in ("ts", "role", "want", "stop")} | {"risk": d["risk"]["class"], "kind": d["risk"]["criticality"]["kind"], "parts": d["risk"]["criticality"]["parts"], "choice": (d["choice"] or {}).get("model")}) + "\n")
 
 
 # ------------------------------------------------------------------ self test
@@ -253,6 +293,28 @@ def self_test() -> None:
     checks.append("a human-set call limit stops the run; no limit means no stop")
     assert "never a weaker reviewer" in fallback_policy("reviewer", "high", False) and fallback_policy("helper", "low", False).startswith("any")
     checks.append("fallback policy: no weaker reviewer on risky work, anything for helpers")
+    # ---- task kind + criticality
+    pm = {"entries": {"src/billing/a.py": {"aspect": "money_billing", "crit": 3}, "docs/a.md": {"aspect": "docs", "crit": 0}, "src/ui/b.tsx": {"aspect": "ui_view", "crit": 1}}}
+    mk = lambda paths, diff="": risk_from_diff(diff, "".join(f"3\t0\t{x}\n" for x in paths), [])
+    ec = lambda paths, diff="", m=pm, kind="", planned=None: effective_criticality(mk(paths, diff), m, [], kind, planned)
+    d = ec(["docs/a.md"])
+    assert d["kind"] == "docs-only" and d["level"] == 0 and wanted("reviewer", d["class"], 0, 0, False) == {"tier": "standard", "effort": "low", "why": wanted("reviewer", "docs", 0, 0, False)["why"]}
+    checks.append("a docs-only change gets the cheapest judging setting (standard tier, low effort), never a light model")
+    bill = ec(["src/billing/a.py"], "+# comment\n")
+    assert bill["level"] == 3 and wanted("reviewer", bill["class"], 0, 0, False)["tier"] == "frontier"
+    checks.append("a comment-only edit inside a level-3 path still gets a frontier reviewer (map wins over a harmless diff)")
+    sneaky = ec(["docs/readme.txt"], "+ALTER TABLE users DROP COLUMN pw;\n+API_KEY=abc123\n", kind="docs-only")
+    assert sneaky["level"] == 3 and wanted("reviewer", sneaky["class"], 0, 0, False) == {"tier": "frontier", "effort": "high", "why": wanted("reviewer", "high", 0, 0, False)["why"]}
+    checks.append("a change labelled docs-only that adds ALTER TABLE / an API key is routed frontier/high (diff content beats the label)")
+    assert ec(["brand/new_file.py"])["level"] == 2 and ec(["docs/a.md"], kind="schema")["level"] == 3
+    assert ec([], m=pm)["level"] == 1 and ec(["x.py"], m=None)["parts"]["map"] == 2
+    assert ec([], kind="docs-only")["level"] == 1 and ec(["docs/a.md"], kind="code")["level"] == 2
+    checks.append("unmapped path is level 2; a declared kind only raises; no diff yet is level 1; no map falls back to name rules")
+    assert ec([], planned=["src/billing/a.py"])["level"] == 3
+    checks.append("planned paths count before a diff exists")
+    seq = [order(wanted("reviewer", c, 0, 0, False)) for c in ("docs", "low", "medium", "high")]
+    assert seq == sorted(seq)
+    checks.append("reviewer cost never goes down as criticality goes up")
     print(json.dumps({"self_test_status": "PASS", "checks_executed": len(checks), "details": checks}, indent=2))
 
 
@@ -265,6 +327,8 @@ def main() -> None:
     ap.add_argument("--blockers", type=int, default=0)
     ap.add_argument("--full-path", action="store_true")
     ap.add_argument("--builder-family", default="")
+    ap.add_argument("--kind", default="", choices=[""] + sorted(KIND_CRIT), help="task kind declared by the orchestrator; can only raise criticality")
+    ap.add_argument("--paths", nargs="*", default=None, help="paths about to be changed (before a diff exists)")
     ap.add_argument("--used-frontier", type=int, default=0)
     ap.add_argument("--used-standard", type=int, default=0)
     ap.add_argument("--rounds", type=int, default=0)
@@ -289,7 +353,7 @@ def main() -> None:
     elif a.command == "route":
         if a.role not in ("helper", "runner", "builder", "test-designer", "reviewer", "second-reviewer"):
             sys.exit("--role must be helper|runner|builder|test-designer|reviewer|second-reviewer")
-        d = route(a.role, cwd, {"failures": a.failures, "blockers": a.blockers, "full_path": a.full_path, "builder_family": a.builder_family,
+        d = route(a.role, cwd, {"failures": a.failures, "blockers": a.blockers, "full_path": a.full_path, "builder_family": a.builder_family, "kind": a.kind, "paths": a.paths,
                                 "used": {"frontier": a.used_frontier, "standard": a.used_standard, "rounds": a.rounds}}, discover)
         log_decision(cwd, d)
         print(json.dumps(d, indent=2))

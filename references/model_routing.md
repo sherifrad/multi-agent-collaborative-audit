@@ -33,6 +33,20 @@ refund, balance, migration, permission, ...), risky files (migrations, schema, C
 weakened, the profile's `Risk paths`, and size. Failures and blockers also come from what the orchestrator measured (test exit
 codes, the ledger), never from the routed agent's own claims, because an agent could use them to keep itself on a cheap tier.
 
+## Criticality: project map, task kind and diff
+The router combines three measured signals: `effective criticality = max(task kind, project map, diff risk)`, on a 0-3 scale
+(0 docs, 1 low, 2 medium, 3 high). It maps to the risk class the table above uses (docs, low, medium, high).
+- **Project map** (`scripts/project_map.py scan --cwd . --write` -> `.agents/PROJECT_MAP.json`): each file gets an aspect and a
+  level from its path, then its content (schema, auth and money patterns), then git fix-commit frequency (skipped with no or
+  shallow history). Level 3 is auth/security, money/billing, data schema and migrations; 2 is core logic, API, data access;
+  1 is tests, CI, UI, config, dependencies; 0 is docs and vendor. A path missing from the map counts as 2, never lower; with no
+  map at all the router judges by path name. `project_map.py summary` prints the <=15 line block for AGENTS.md. Tools read the
+  map; agents do not load it. `Risk paths` in the profile can only raise a path to 3.
+- **Task kind**: inferred from the changed paths and diff (docs-only, tests-only, code, sensitive). The orchestrator may pass
+  `--kind` or `--paths` (files about to change); a declared kind can only raise criticality. The diff content always beats a label:
+  a change called docs-only that adds `ALTER TABLE` or an API key is routed frontier/high.
+- A docs-only change gets a judging role at standard tier with low effort; nothing is ever routed to a light model for judging.
+
 ## Fallback when quota runs out
 | Role | Fallback |
 | :-- | :-- |

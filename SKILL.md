@@ -114,7 +114,9 @@ independence level reachable, and each withheld vendor with the exact fix; print
 (`references/fleet_profiles.md`). It never dispatches or writes. **Then route each role:** for every role you are about to
 spawn or dispatch, run `python3 scripts/model_router.py route --role <role>` and use the model, reasoning effort and fallback chain it
 returns (`references/model_routing.md`). Judging roles never get a light model; helpers never get a frontier one; do not pick a model by
-habit. Pass failures and blockers you measured, never the agent's own report. If it returns a `stop` (`BUDGET_EXHAUSTED`,
+habit. Pass failures and blockers you measured, never the agent's own report. Run `python3 scripts/project_map.py scan --cwd . --write`
+once per project (it refreshes incrementally) so the router knows which paths are auth, money or schema; pass `--paths` for files
+you are about to change. The map and task kind only ever raise the tier or effort. If it returns a `stop` (`BUDGET_EXHAUSTED`,
 `QUOTA_EXHAUSTED`), stop and report; never raise the limit yourself. Solo mode uses the roster in `resources/subagents/`. Then state the review's independence level in the first status
 line: *multi-vendor* (2+ model families), *same-family* (only Claude subagents), or *single-model*. A
 sandbox shell often cannot see CLIs installed on the user's own machine; if the profile expects a fleet and
