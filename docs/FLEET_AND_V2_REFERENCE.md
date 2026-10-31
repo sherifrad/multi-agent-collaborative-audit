@@ -69,7 +69,7 @@ flowchart TD
 
     Boot --> Spec --> MockGate --> Plan
 
-    subgraph DynamicRouter["⚡ Dynamic Multi-Adapter Fleet Router (scripts/fleet_dispatch.py)"]
+    subgraph DynamicRouter["⚡ Dynamic Multi-Adapter Fleet Router (scripts/fleet_select.py, model_router.py, fleet_run.py)"]
         direction TB
         UI["🎨 UI/UX Mocking Lane<br/><b>Visual Design Contract</b><br/>• Interactive HTML/SVG Prototypes<br/>• WCAG 2.1 AA a11y & Visual State"]
         Logic["🧠 Core Logic Lane<br/><b>Algorithmic & State Contract</b><br/>• Business Algorithms & State Machines<br/>• Concurrency & Query Optimization"]
@@ -98,102 +98,18 @@ flowchart TD
 
 ---
 
-## 🔌 Dynamic Multi-Adapter Fleet Router & Zero-API Resilience
+## Fleet selection, model routing and delegation
 
-MACA's Fleet Dispatcher ([`scripts/fleet_dispatch.py`](scripts/fleet_dispatch.py)) lets each user configure their own fleet in [`.agents/fleet.json`](resources/templates/fleet.template.json) without depending on specific vendors, paid subscriptions, or proprietary APIs.
+MACA keeps no vendor list of its own. Delegation uses the upstream delegate skills (`vendor/delegate-skills/`, pinned in `VENDOR.md`).
 
-```mermaid
-flowchart TD
-    Dispatch["Lane Task Dispatched"] --> PrimaryCheck{"Attempt Primary<br/>Configured Adapter"}
-    
-    PrimaryCheck -->|Success| Success["✅ Lane Task Complete"]
-    
-    PrimaryCheck -->|Unreachable Server / 5xx / Rate Limit / Missing CLI| FailHandler["⚠️ Catch Error & Log Diagnostic Event<br/>(Record primary failure without crashing)"]
-    
-    FailHandler --> CascadeCheck{"Check Fallback Adapter<br/>in .agents/fleet.json"}
-    
-    CascadeCheck -->|Configured Fallback| FallbackRun["🔄 Execute Fallback Adapter<br/>(CLI -> Subagent -> Persona)"]
-    
-    FallbackRun -->|Success| FallbackSuccess["✅ Task Rescued via Fallback<br/>(Pipeline Continues Unbroken)"]
-    FallbackRun -->|Exhausted| SafeHalt["🛑 Controlled Diagnostic Halt<br/>(Actionable Remediation Guidance)"]
-```
+| Step | Tool | Decides |
+| :-- | :-- | :-- |
+| 1. Who is available and allowed | `scripts/fleet_select.py` | archetype (solo / pair / fleet), vendors withheld and why, best independence level |
+| 2. Which model and how much reasoning | `scripts/model_router.py route --role R` | tier (light / standard / frontier) and effort per role, from measured signals; call budget |
+| 3. Run it, with fallback | `scripts/fleet_run.py` | runs the chain through the upstream relays, read-only unless a person allowed writing |
 
-### 1. The 4 Universal Execution Adapters
-
-1. **`zero-api` In-IDE Subagents ($0 Cost, Zero Keys)**:
-   * **For users who do not have external API keys or paid CLI subscriptions**:
-   * Uses native In-IDE subagents or Single-Model Tabula Rasa context-reset personas.
-   * Completely self-contained, operates within your active IDE session, and costs nothing.
-2. **`cli` Local Agentic CLIs**:
-   * Spawns pre-installed AI CLIs (`claude`, `opencode`, `codex`, `agy`, `cursor`, `aider`, `goose`).
-   * Inherits your existing terminal authentication, local credentials, and default model setups.
-3. **`api` Direct HTTP Endpoints (OpenAI-Compatible & Custom)**:
-   * Native HTTP client using Python's standard library (`urllib.request`) — zero npm/pip dependencies.
-   * Works with OpenAI, DeepSeek API, Anthropic API, Google GenAI API, OpenRouter, or **free local LLMs** running via **Ollama** (`http://127.0.0.1:11434`) or **vLLM**.
-4. **`script` Custom Executable Wrappers**:
-   * Executes arbitrary custom agent scripts or binaries (`./scripts/my_agent.sh`).
-
-### 2. Declarative Fleet Manifest (`.agents/fleet.json`)
-
-To customize your fleet, create `.agents/fleet.json` (or generate one automatically with `python3 scripts/fleet_dispatch.py --init-config`):
-
-```json
-{
-  "lanes": {
-    "ui_ux": {
-      "primary": { "adapter": "cli", "binary": "claude", "model": "claude-3-7-sonnet" },
-      "fallback": { "adapter": "subagent", "role_name": "UI/UX Designer" }
-    },
-    "core_logic": {
-      "primary": {
-        "adapter": "api",
-        "protocol": "openai-compatible",
-        "endpoint": "https://api.deepseek.com/v1/chat/completions",
-        "api_key_env": "DEEPSEEK_API_KEY",
-        "model": "deepseek-reasoner"
-      },
-      "fallback": { "adapter": "subagent", "role_name": "Core Logic Engineer" }
-    },
-    "data": {
-      "primary": { "adapter": "cli", "binary": "codex" },
-      "fallback": { "adapter": "subagent", "role_name": "Data Architect" }
-    },
-    "qa_referee": {
-      "primary": { "adapter": "cli", "binary": "gemini", "args": ["-p", "{brief}"] },
-      "fallback": { "adapter": "subagent", "role_name": "QA Referee" }
-    }
-  }
-}
-```
-
-### 3. Unreachable Server & Fail-Safe Cascade
-
-* **Automatic Timeout & Network Protection**: Direct API requests have strict configurable timeouts (default 30s).
-* **Fault-Tolerant Cascade**: If a remote API server goes down, returns `HTTP 500/503`, hits rate limits (`HTTP 429`), or an external CLI is uninstalled:
-  1. The error is captured gracefully without crashing the turn.
-  2. The failure cause is documented in the audit log.
-  3. The dispatcher immediately cascades to the designated fallback (such as the In-IDE subagent).
-* **Pipeline Continuity**: Work never halts due to transient network failures or missing API credits.
-
-### 4. Built-in Detection, Self-Repair & Resilience Testing
-
-The fleet engine includes a comprehensive test and repair suite:
-
-```bash
-# Run comprehensive resilience and fallback self-tests
-python3 scripts/fleet_dispatch.py --self-test
-
-# Detect available local CLIs and environment API keys
-python3 scripts/fleet_dispatch.py --detect-only
-
-# Initialize a tailored .agents/fleet.json for current workspace
-python3 scripts/fleet_dispatch.py --init-config
-
-# Validate and automatically repair missing keys or schema errors
-python3 scripts/fleet_dispatch.py --validate .agents/fleet.json
-```
-
----
+See `references/fleet_profiles.md` and `references/model_routing.md`. Local models (Ollama and similar) are reached through
+opencode providers, not through a MACA adapter.
 
 ## 🔄 The 5-Phase SDD Engineering Workflow
 
@@ -412,30 +328,16 @@ Choose the track that fits your development environment:
 python3 scripts/skill_ambassador_auditor.py --init-log . --feature "MyFeature"
 ```
 
-### Track 2: Power User (Local AI CLIs)
-* **Pre-requisites**: Installed CLIs (`claude`, `opencode`, `codex`, `gemini`, `agy`).
-* **How it works**: The router automatically dispatches tasks across your installed tools with fallback protection.
+### Track 2: Power User (installed CLIs)
+* **Pre-requisites**: one or more installed, signed-in CLIs (`claude`, `codex`, `opencode`, `agy`), listed in the profile's `Approved vendors`.
 ```bash
-# 1. Detect installed CLIs
-python3 scripts/fleet_dispatch.py --detect-only
-
-# 2. Initialize tailored fleet config
-python3 scripts/fleet_dispatch.py --init-config
-
-# 3. Dispatch a task to any lane
-python3 scripts/fleet_dispatch.py --dispatch ui_ux --brief "Build responsive SVG header"
+python3 scripts/fleet_select.py --cwd .                 # archetype, roles, withheld vendors
+python3 scripts/model_router.py route --role reviewer   # tier, effort, candidate chain
+python3 scripts/fleet_run.py --brief brief.md --cd . --out-dir .agents/fleet-runs/r1 --chain 'agy:gemini-3.8-flash-high' --read-only
 ```
 
-### Track 3: Custom APIs & Local Models (Ollama / DeepSeek)
-* **Pre-requisites**: Local Ollama server or standard API keys in environment.
-* **How it works**: Declare your custom endpoints in `.agents/fleet.json`:
-```bash
-# Point core_logic to local Ollama (100% private, free):
-# In .agents/fleet.json -> endpoint: "http://127.0.0.1:11434/v1/chat/completions"
-
-# Validate manifest syntax & reachability
-python3 scripts/fleet_dispatch.py --validate .agents/fleet.json
-```
+### Track 3: Local and free models
+* Free models and local servers come through opencode (`opencode/*-free`, or an Ollama provider). The router prefers free models for light work.
 
 ---
 
@@ -445,7 +347,7 @@ python3 scripts/fleet_dispatch.py --validate .agents/fleet.json
 | :--- | :--- | :--- | :--- |
 | **`bootstrap.sh`** | `./scripts/bootstrap.sh` | `--force-first-run` | Verifies skill integrity & discovers runtime environment |
 | **`first_run_preflight.py`** | `python3 scripts/first_run_preflight.py` | `--force`, `--json` | Runs deep 29-item self-test & tool inventory diagnostic |
-| **`fleet_dispatch.py`** | `python3 scripts/fleet_dispatch.py` | `--self-test`, `--detect-only`, `--init-config`, `--validate`, `--dispatch <lane>` | Model-agnostic multi-adapter router with fail-safe cascade |
+| **`fleet_select.py` / `model_router.py` / `fleet_run.py`** | `python3 scripts/<name>.py` | `--self-test` | Fleet plan, model and effort per role, relay runner with fallback |
 | **`scenario_and_callchain_engine.py`** | `python3 scripts/scenario_and_callchain_engine.py` | `--self-test`, `--mode <A/B/C>`, `--trace-dir <dir>` | Anti-bulk-mock sequential oracle & caller graph tracer |
 | **`skill_ambassador_auditor.py`** | `python3 scripts/skill_ambassador_auditor.py` | `--self-test`, `--init-log <dir>`, `--audit-workspace <dir>` | Enforces procedural gates G-01 through G-09 |
 | **`measure_metrics.py`** | `python3 scripts/measure_metrics.py` | `--self-test`, `--notify <Title> <Msg>`, `--json`, `--port <n>` | Telemetry cockpit, notifications & Ponytail analytics |

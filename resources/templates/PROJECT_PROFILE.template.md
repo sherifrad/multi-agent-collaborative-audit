@@ -11,9 +11,13 @@
 - **Risk level** (low | medium | high | safety-critical) and why:
 - **Stack and commands** (language, build, test, lint; how to run one test):
 - **Cost preference** (economy | balanced | thorough): default tier ceilings follow this, see `references/token_economy.md`
-- **Model tiers** (planner/reviewer: ___ ; builder: ___ ; runner/cheap tasks: ___ ; or "use session default")
+- **Model tiers** (confirm models in `.agents/model_catalog.json`; `python3 scripts/model_router.py catalog --write` seeds it as `inferred`; or write "use session default")
+- **Max frontier calls** (a human sets this; the router stops at the limit and never raises it; blank = no limit):
+- **Max standard calls** (same rule):
+- **Max rounds** (review/fix rounds before stopping):
+- **Risk paths** (globs or words that always mean high risk, comma separated, e.g. `billing/*, auth/*`):
 - **Approvals** (who approves UI mocks, thresholds, releases):
-- **Approved vendors** (external CLIs/APIs allowed to receive code and specs: opencode, codex, gemini, agy; write `none` if none. A lane listed in fleet.json is NOT an approval):
+- **Approved vendors** (external CLIs/APIs allowed to receive code and specs: opencode, codex, gemini, agy; write `none` if none. A lane in the delegate-setup config is NOT an approval):
 - **Write-lane permissions** (may an external lane edit files? `none` = read-only review only; or name the vendor and mode, e.g. `codex: workspace-write`):
 - **Max tier ceiling without asking** (T1-T4):
 - **Unattended policy** (what the AI may decide alone, what must wait for a human; default: see SKILL.md section 5):

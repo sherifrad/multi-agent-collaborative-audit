@@ -164,7 +164,7 @@ bash scripts/bootstrap.sh
 python3 scripts/impact_and_cache.py select --ws . --max-tier 2
 ```
 
-Zero-API mode works with in-IDE subagents. With installed CLIs (`claude`, `codex`, `opencode`, `gemini`, `agy`) the router dispatches lanes across different models for more independent review (`python3 scripts/fleet_dispatch.py --detect-only`).
+Zero-API mode works with in-IDE subagents. With installed CLIs (`claude`, `codex`, `opencode`, `gemini`, `agy`) the router dispatches lanes across different models for more independent review (`python3 scripts/fleet_select.py`).
 
 ## 🛠️ Scripts
 
@@ -172,7 +172,9 @@ Zero-API mode works with in-IDE subagents. With installed CLIs (`claude`, `codex
 |---|---|
 | `impact_and_cache.py` | select RUN / REUSE / DEFER, record evidence, invalidate |
 | `harness.py` | check / register / run / promote reusable helper scripts |
-| `fleet_dispatch.py` | model-agnostic multi-CLI router with fallback |
+| `fleet_select.py` | which vendors fill which roles, from discovery, delegate-setup lanes and profile approvals |
+| `model_router.py` | model tier and reasoning effort per role from measured signals, with a call budget |
+| `fleet_run.py` | runs one lane through the upstream relays with a fallback chain |
 | `scenario_and_callchain_engine.py` | sequential scenarios, caller tracing, auth-fuzz matrix |
 | `skill_ambassador_auditor.py` | procedural gates and compliance log |
 | `lint_samd_invariants.py`, `lint_design_and_ux.py` | safety/auth and UI linters (0 files scanned ≠ evidence) |

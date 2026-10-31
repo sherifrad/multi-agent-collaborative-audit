@@ -21,8 +21,7 @@ regression) and implementation mode can run alone on the Light path with one rev
 
 ## The Orchestrator
 
-The orchestrator is the agent that talks to the user in this session (or the one named in `.agents/fleet.json`
-under `orchestrator`). It is a router and record-keeper, not a builder. Duties:
+The orchestrator is the agent that talks to the user in this session (or the one the user names). It is a router and record-keeper, not a builder. Duties:
 
 1. Pick mode and weight (Light or Full) and say so.
 2. Write or approve the spec and outcome oracles; hold the single source of truth in `.agents/`.

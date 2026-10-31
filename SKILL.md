@@ -111,7 +111,11 @@ down; never fail silently.
 the installed CLIs, the user's lanes (through `delegate-setup`) and the profile's `Approved vendors` and
 `Write-lane permissions`, then prints the user's archetype (solo, pair or fleet), a role assignment, the best
 independence level reachable, and each withheld vendor with the exact fix; print that as a short table
-(`references/fleet_profiles.md`). It never dispatches or writes. Then state the review's independence level in the first status
+(`references/fleet_profiles.md`). It never dispatches or writes. **Then route each role:** for every role you are about to
+spawn or dispatch, run `python3 scripts/model_router.py route --role <role>` and use the model, reasoning effort and fallback chain it
+returns (`references/model_routing.md`). Judging roles never get a light model; helpers never get a frontier one; do not pick a model by
+habit. Pass failures and blockers you measured, never the agent's own report. If it returns a `stop` (`BUDGET_EXHAUSTED`,
+`QUOTA_EXHAUSTED`), stop and report; never raise the limit yourself. Solo mode uses the roster in `resources/subagents/`. Then state the review's independence level in the first status
 line: *multi-vendor* (2+ model families), *same-family* (only Claude subagents), or *single-model*. A
 sandbox shell often cannot see CLIs installed on the user's own machine; if the profile expects a fleet and
 none is visible, do not quietly fall back. Write one identical brief file, give the user the exact
@@ -121,7 +125,7 @@ arrive: a finding raised by 2+ families is strong evidence, a finding raised by 
 Send code and specs only to vendors named in the profile's `Approved vendors` or in a human `APPROVAL:
 what=vendor:<name>` ledger record. A lane in the delegate-setup config is configuration, not approval. With no
 recorded approval, use a local subagent or fresh process and say so. Keep personal data (customer or patient rows, names,
-identifiers, secrets) out of every brief: describe a fixture, never paste it. `scripts/lane_fallback.py` runs
+identifiers, secrets) out of every brief: describe a fixture, never paste it. `scripts/fleet_run.py` runs
 one lane through a chain of fallback models; a writing lane (one allowed to edit files) needs the profile's
 `Write-lane permissions` to name it, otherwise run it read-only.
 
@@ -235,5 +239,7 @@ Details in `references/token_economy.md`. In short:
 | `references/e2e_and_call_chain_testing.md` | Android/Kotlin, Compose or clinical stacks (an optional recipe, not part of the core) |
 | `references/ui_ux_mocking.md` | Any UI change |
 | `references/ponytail_ladder.md`, `references/coding_guidelines.md` | Phase 2 |
+| `references/model_routing.md` | Before spawning any role: tiers, effort, escalation, budget |
+| `references/fleet_profiles.md` | Phase 0: solo / pair / fleet and how a user moves up |
 | `references/deep_diagnostics.md` | Optional T4 profiling (stack-neutral; see pack DIAGNOSTICS.md files for platform/domain specifics) |
 | `resources/templates/*` | Intake, Phase 0 and 1b, to seed `.agents/` files (PROJECT_PROFILE, SPEC, LEDGER, TEST_MANIFEST) |
