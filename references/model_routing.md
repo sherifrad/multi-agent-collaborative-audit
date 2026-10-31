@@ -42,6 +42,11 @@ The router combines three measured signals: `effective criticality = max(task ki
   1 is tests, CI, UI, config, dependencies; 0 is docs and vendor. A path missing from the map counts as 2, never lower; with no
   map at all the router judges by path name. `project_map.py summary` prints the <=15 line block for AGENTS.md. Tools read the
   map; agents do not load it. `Risk paths` in the profile can only raise a path to 3.
+  `Downgrade paths` (comma separated `glob=level`, level 0-2, e.g. `evidence/**=0, **/ui/**=1`) is the only way to lower a
+  path, and only a human writes it: an `inferred` value is ignored, and a `Risk paths` match still wins. Build output and run
+  reports (`*.log`, `*.apk`, `result*.json`, `stdout.txt`) score 0 by default. A downgraded or artifact file's diff is not scored,
+  except when it adds a secret-shaped value (vendor key formats adapted from the MIT-licensed Gitleaks rules). In prose files
+  (docs) only schema statements count, not words like "auth". Removing a guard or permission check in non-test code counts as high.
 - **Task kind**: inferred from the changed paths and diff (docs-only, tests-only, code, sensitive). The orchestrator may pass
   `--kind` or `--paths` (files about to change); a declared kind can only raise criticality. The diff content always beats a label:
   a change called docs-only that adds `ALTER TABLE` or an API key is routed frontier/high.

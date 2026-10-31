@@ -20,7 +20,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-RULES_VERSION = 1
+RULES_VERSION = 2
 UNMAPPED = 2
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build", ".agents", ".idea", ".gradle", "Pods"}
 CODE_EXT = {".py", ".js", ".ts", ".tsx", ".jsx", ".kt", ".java", ".go", ".rs", ".swift", ".rb", ".php", ".c", ".cc", ".cpp", ".cs", ".sql", ".sh"}
@@ -72,7 +72,7 @@ def classify_path(rel: str) -> Dict[str, Any]:
         return {"aspect": "dependencies", "crit": 1}
     if ext in (".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp"):
         return {"aspect": "ui_view", "crit": 1}
-    if ext in (".apk", ".aab", ".log", ".zip", ".jar", ".out") or name in ("stdout.txt", "stderr.txt"):
+    if ext in (".apk", ".aab", ".log", ".zip", ".jar", ".out") or name in ("stdout.txt", "stderr.txt") or re.fullmatch(r"result[\w.-]*\.json", name):
         return {"aspect": "artifact", "crit": 0}
     if name == "androidmanifest.xml":
         return {"aspect": "manifest_permissions", "crit": 2}
@@ -179,12 +179,34 @@ def load_map(cwd: Path) -> Optional[Dict[str, Any]]:
         return None
 
 
-def lookup(pmap: Optional[Dict[str, Any]], paths: List[str], risk_paths: Optional[List[str]] = None) -> Dict[str, int]:
-    """Criticality per path. Unmapped = 2. A human `Risk paths` glob only ever raises a path to 3."""
+def parse_downgrades(text: Optional[str]) -> List["tuple[str, int]"]:
+    """`Downgrade paths` profile field: comma-separated `glob=level`, level 0-2. Level 3 is not a downgrade, so it is ignored."""
+    out = []
+    for item in re.split(r"[,;]", text or ""):
+        m = re.fullmatch(r"\s*(\S+?)\s*=\s*([0-2])\s*", item)
+        if m:
+            out.append((m.group(1), int(m.group(2))))
+    return out
+
+
+def downgrade_for(path: str, downgrades: Optional[List["tuple[str, int]"]]) -> Optional[int]:
+    for g, lvl in downgrades or []:
+        if fnmatch.fnmatch(path, g):
+            return lvl
+    return None
+
+
+def lookup(pmap: Optional[Dict[str, Any]], paths: List[str], risk_paths: Optional[List[str]] = None,
+           downgrades: Optional[List["tuple[str, int]"]] = None) -> Dict[str, int]:
+    """Criticality per path. Unmapped = 2. A human `Downgrade paths` glob sets a path to its stated level (0-2), then a human
+    `Risk paths` glob raises to 3, so a path in both is high. Only the profile can lower a level; agents cannot."""
     entries = (pmap or {}).get("entries", {})
     out = {}
     for p in paths:
         c = entries[p]["crit"] if p in entries else UNMAPPED
+        d = downgrade_for(p, downgrades)
+        if d is not None:
+            c = d
         if any(fnmatch.fnmatch(p, g) for g in (risk_paths or [])):
             c = 3
         out[p] = c

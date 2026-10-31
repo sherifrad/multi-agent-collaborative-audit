@@ -30,7 +30,24 @@ TIERS = ["light", "standard", "frontier"]
 EFFORTS = ["low", "medium", "high"]
 JUDGING = {"builder", "test-designer", "reviewer", "second-reviewer"}
 SENSITIVE = re.compile(r"\b(auth(?:n|z|entic\w*|oriz\w*)?|token|secret|password|passwd|crypto\w*|payment|charge|refund|balance|invoice|migrat\w+|drop\s+table|permission\w*|session|jwt|exec|eval|alter\s+table|create\s+table|api[_ ]?key|private_key|client_secret|billing|dosage|medication|gestational|stripe|paypal|bcrypt|argon2|hmac|csrf)\b", re.I)
-SECRET_SHAPE = re.compile(r"[A-Za-z0-9_]*(api[_-]?key|secret|token|passw(or)?d|private[_-]?key)[A-Za-z0-9_]*\s*[=:]\s*\S+|\bsk_(live|test)_|\bAKIA[0-9A-Z]{16}\b|-----BEGIN [A-Z ]*PRIVATE KEY", re.I)
+# Secret shapes. The vendor-specific token formats below are adapted from the Gitleaks default rules
+# (https://github.com/gitleaks/gitleaks, MIT License, Copyright (c) 2019 Zachary Rice). Only the regexes are used; no Gitleaks code or binary.
+SECRET_SHAPE = re.compile("|".join([
+    r"[A-Za-z0-9_]*(?:api[_-]?key|secret|token|passw(?:or)?d|private[_-]?key)[A-Za-z0-9_]*\s*[=:]\s*\S+",   # NAME = value
+    r"\bsk_(?:live|test)_[0-9a-zA-Z]{8,}",                      # Stripe secret key
+    r"\b(?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z2-7]{16}\b",      # AWS access key id
+    r"\bgh[pousr]_[A-Za-z0-9]{36,}\b|\bgithub_pat_\w{22,}",     # GitHub tokens
+    r"\bglpat-[\w-]{20}\b",                                     # GitLab PAT
+    r"\bxox[abposr]-[0-9A-Za-z-]{10,}",                         # Slack tokens
+    r"\bAIza[\w-]{35}\b",                                       # Google API key
+    r"\bsk-(?:proj-|ant-)?[A-Za-z0-9_-]{32,}",                  # OpenAI / Anthropic style keys
+    r"\bSG\.[\w-]{16,32}\.[\w-]{16,64}\b",                     # SendGrid
+    r"\bey[A-Za-z0-9]{15,}\.ey[A-Za-z0-9/_-]{15,}\.[A-Za-z0-9/_-]{10,}",   # JWT
+    r"-----BEGIN [A-Z ]*PRIVATE KEY",                            # PEM private key
+]), re.I)
+STRONG_DOC = re.compile(r"\b(drop\s+table|alter\s+table|create\s+table)\b", re.I)   # in prose files only schema statements count, not words like "auth"
+GUARD_REMOVED = re.compile(r"^-\s*(?:@(?:RequiresPermission|PreAuthorize|Secured|Authenticated|RolesAllowed)\b|(?:require|check|assert)\w*\s*[(\s]|.*\b(?:isAdmin|hasPermission|checkPermission|hasRole|isAuthenticated)\b)")
+TEST_PATH = re.compile(r"(^|/)(tests?|spec|__tests__|e2e|fixtures|androidTest)/|test_|_test\.|\.test\.|\.spec\.|Test\.\w+$")
 RISKY_FILES = ("migrations/", "migration", "schema", ".github/workflows/", "package-lock.json", "yarn.lock", "poetry.lock", "Cargo.lock", "go.sum", "Dockerfile", "permissions", "rbac")
 CODE_EXT = (".py", ".js", ".ts", ".tsx", ".jsx", ".kt", ".java", ".go", ".rs", ".swift", ".rb", ".php", ".c", ".cc", ".cpp", ".cs", ".sql")
 
@@ -87,7 +104,7 @@ def git(cwd: Path, *args: str) -> str:
         return ""
 
 
-def risk_from_diff(diff: str, numstat: str, risk_paths: List[str]) -> Dict[str, Any]:
+def risk_from_diff(diff: str, numstat: str, risk_paths: List[str], downgrades: Optional[list] = None) -> Dict[str, Any]:
     files, added, removed_tests, added_tests = [], 0, 0, 0
     for line in numstat.splitlines():
         parts = line.split("\t")
@@ -95,13 +112,28 @@ def risk_from_diff(diff: str, numstat: str, risk_paths: List[str]) -> Dict[str, 
             files.append(parts[2]); added += int(parts[0])
             if re.search(r"(^|/)(tests?|spec|__tests__|e2e|fixtures)/|test_|_test\.|\.test\.|\.spec\.", parts[2]):
                 added_tests += int(parts[0]); removed_tests += int(parts[1])
-    hits = sorted({m.group(1).lower() for l in diff.splitlines() if l.startswith("+") and not l.startswith("+++") for m in [SENSITIVE.search(l)] if m})
-    plus_lines = [l for l in diff.splitlines() if l.startswith("+") and not l.startswith("+++")]
+    diff = drop_downgraded(diff, downgrades)
+    hits, guards, plus_lines = set(), False, []
+    for sec in re.split(r"(?m)^(?=diff --git )", diff):
+        m = re.match(r"diff --git a/(\S+) b/", sec)
+        path = m.group(1) if m else ""
+        prose = bool(path) and project_map.classify_path(path)["aspect"] == "docs"
+        rx = STRONG_DOC if prose else SENSITIVE
+        for l in sec.splitlines():
+            if l.startswith("+") and not l.startswith("+++"):
+                plus_lines.append(l)
+                hit = rx.search(l)
+                if hit: hits.add(hit.group(1 if rx is SENSITIVE else 0).lower())
+            elif l.startswith("-") and not l.startswith("---") and path and not prose and not TEST_PATH.search(path) and GUARD_REMOVED.search(l):
+                guards = True
+    hits = sorted(hits)
     if any(SECRET_SHAPE.search(l) for l in plus_lines):
         hits = sorted(set(hits) | {"secret-shaped value"})
-    risky = [f for f in files if any(r.lower() in f.lower() for r in RISKY_FILES) or any(fnmatch.fnmatch(f, g) for g in risk_paths)]
+    risky = [f for f in files if any(fnmatch.fnmatch(f, g) for g in risk_paths)
+             or (any(r.lower() in f.lower() for r in RISKY_FILES) and project_map.downgrade_for(f, downgrades) is None)]
     reasons = []
     if hits: reasons.append(f"sensitive words added: {', '.join(hits[:5])}")
+    if guards: reasons.append("a guard or permission check was removed")
     if risky: reasons.append(f"risky files changed: {', '.join(risky[:3])}")
     if removed_tests > added_tests: reasons.append("tests were removed or weakened")
     cls = "high" if reasons else "medium" if len(files) >= 4 or added >= 150 else "low"
@@ -109,7 +141,7 @@ def risk_from_diff(diff: str, numstat: str, risk_paths: List[str]) -> Dict[str, 
     return {"class": cls, "files": len(files), "lines_added": added, "reasons": reasons, "paths": files}
 
 
-def untracked_as_diff(cwd: Path, limit: int = 200) -> "tuple[str, str]":
+def untracked_as_diff(cwd: Path, limit: int = 200, downgrades: Optional[list] = None) -> "tuple[str, str]":
     """New files are invisible to `git diff`. Treat each untracked text file as fully added so a new auth or clinical file is scored."""
     diff, numstat = [], []
     fresh = [r for r in git(cwd, "ls-files", "--others", "--exclude-standard").splitlines() if not set(r.split("/")[:-1]) & project_map.SKIP_DIRS]
@@ -123,16 +155,37 @@ def untracked_as_diff(cwd: Path, limit: int = 200) -> "tuple[str, str]":
             numstat.append(f"1\t0\t{rel}"); continue
         lines = text.splitlines()
         numstat.append(f"{len(lines)}\t0\t{rel}")
-        if project_map.classify_path(rel)["aspect"] != "artifact":   # run logs and build output are not source; do not score their words
-            diff.extend("+" + l for l in lines)
+        if project_map.classify_path(rel)["aspect"] == "artifact":   # run logs and build output are not source; do not score their words
+            continue
+        if project_map.downgrade_for(rel, downgrades) is not None and not any(SECRET_SHAPE.search(l) for l in lines):
+            continue   # a human downgraded this path; only a secret-shaped value still counts
+        diff.extend("+" + l for l in lines)
     return "\n".join(diff) + "\n", "\n".join(numstat) + "\n"
 
 
-def measure_risk(cwd: Path, risk_paths: List[str]) -> Dict[str, Any]:
+def human_downgrades(profile: str) -> list:
+    """Parsed `Downgrade paths`. An inferred value is ignored: lowering criticality is the unsafe direction, so only a human-confirmed entry counts."""
+    raw = profile_field(profile, "Downgrade paths")
+    return [] if "inferred" in raw.lower() else project_map.parse_downgrades(raw)
+
+
+def drop_downgraded(diff: str, downgrades: Optional[list]) -> str:
+    """Remove the sections of a tracked-file diff that are build output or that a human downgraded, unless the section adds a secret-shaped value."""
+    kept = []
+    for sec in re.split(r"(?m)^(?=diff --git )", diff):
+        m = re.match(r"diff --git a/(\S+) b/", sec)
+        if m and (project_map.classify_path(m.group(1))["aspect"] == "artifact" or project_map.downgrade_for(m.group(1), downgrades) is not None) \
+                and not any(l.startswith("+") and SECRET_SHAPE.search(l) for l in sec.splitlines()):
+            continue
+        kept.append(sec)
+    return "".join(kept)
+
+
+def measure_risk(cwd: Path, risk_paths: List[str], downgrades: Optional[list] = None) -> Dict[str, Any]:
     base = "HEAD" if git(cwd, "rev-parse", "--verify", "HEAD").strip() else ""
     args = ["diff", "--no-renames", base] if base else ["diff", "--no-renames"]   # a rename must not hide a path like src/{auth => common}/
-    new_diff, new_stat = untracked_as_diff(cwd)
-    r = risk_from_diff(git(cwd, *args, "-U0") + new_diff, git(cwd, *args, "--numstat") + new_stat, risk_paths)
+    new_diff, new_stat = untracked_as_diff(cwd, downgrades=downgrades)
+    r = risk_from_diff(git(cwd, *args, "-U0") + new_diff, git(cwd, *args, "--numstat") + new_stat, risk_paths, downgrades)
     r["source"] = "git diff + untracked files (measured by the orchestrator)"
     return r
 
@@ -143,11 +196,15 @@ CRIT_CLASS = {0: "docs", 1: "low", 2: "medium", 3: "high"}
 
 
 def effective_criticality(risk: Dict[str, Any], pmap: Optional[Dict[str, Any]], risk_paths: List[str],
-                          declared_kind: str = "", planned: Optional[List[str]] = None) -> Dict[str, Any]:
+                          declared_kind: str = "", planned: Optional[List[str]] = None, downgrades: Optional[list] = None) -> Dict[str, Any]:
     """max(task kind, project map, diff risk). Kind is inferred from the changed paths and diff; a kind declared by the
     orchestrator or an agent can only raise it. The diff content always wins over a name or a label."""
     paths = sorted(set(risk.get("paths", [])) | set(planned or []))
     by_name = [project_map.classify_path(p) for p in paths]
+    for i, p in enumerate(paths):   # a human downgrade lowers the name-based level too; Risk paths still win
+        d = project_map.downgrade_for(p, downgrades)
+        if d is not None and not any(fnmatch.fnmatch(p, g) for g in risk_paths):
+            by_name[i] = {"aspect": by_name[i]["aspect"], "crit": d}
     sensitive = any("sensitive" in r for r in risk.get("reasons", []))
     if not paths:
         kind, kind_crit = "unknown", 1
@@ -159,9 +216,11 @@ def effective_criticality(risk: Dict[str, Any], pmap: Optional[Dict[str, Any]], 
         kind, kind_crit = "sensitive", 3
     else:
         kind, kind_crit = "code", 2
+        if all(project_map.downgrade_for(p, downgrades) is not None and not any(fnmatch.fnmatch(p, g) for g in risk_paths) for p in paths):
+            kind_crit = max(a["crit"] for a in by_name)   # a human lowered every changed path
     declared = KIND_CRIT.get(declared_kind, 0)
     if pmap:
-        map_crit = max(project_map.lookup(pmap, paths, risk_paths).values(), default=0)
+        map_crit = max(project_map.lookup(pmap, paths, risk_paths, downgrades).values(), default=0)
     else:   # never scanned: judge by name with the scanner's own rules
         map_crit = max([a["crit"] for a in by_name] + [3 if any(fnmatch.fnmatch(p, g) for g in risk_paths for p in paths) else 0])
     diff_crit = {"high": 3, "medium": 2}.get(risk["class"], 0)
@@ -243,9 +302,10 @@ def budget_state(profile: str, used: Dict[str, int]) -> Dict[str, Any]:
 def route(role: str, cwd: Path, signals: Dict[str, Any], discover: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     profile = read(cwd / ".agents" / "PROJECT_PROFILE.md")
     risk_paths = [p.strip() for p in re.split(r"[,;]", profile_field(profile, "Risk paths") or "") if p.strip() and "inferred" not in p.lower()]
-    diff_risk = signals.get("risk") or measure_risk(cwd, risk_paths)
+    downgrades = human_downgrades(profile)
+    diff_risk = signals.get("risk") or measure_risk(cwd, risk_paths, downgrades)
     saved = project_map.load_map(cwd)   # no saved map: scan in memory, read-only; never fall back to names alone
-    crit = effective_criticality(diff_risk, saved or project_map.scan(cwd), risk_paths, signals.get("kind", ""), signals.get("paths"))
+    crit = effective_criticality(diff_risk, saved or project_map.scan(cwd), risk_paths, signals.get("kind", ""), signals.get("paths"), downgrades)
     risk = dict(diff_risk, diff_class=diff_risk["class"], criticality=crit)
     risk["class"] = crit["class"]
     want = wanted(role, risk["class"], signals.get("failures", 0), signals.get("blockers", 0), signals.get("full_path", False))
@@ -356,6 +416,41 @@ def self_test() -> None:
         nd, ns = untracked_as_diff(Path(t))
         assert "src/login.py" in ns and risk_from_diff(nd, ns, [])["class"] == "high"
     checks.append("a brand-new untracked file is scored like an added file (git diff alone would not see it)")
+    # ---- human-only downgrades
+    dg = project_map.parse_downgrades("retry/**=0, src/ui/*=1, src/billing/*=3, bad=x")
+    assert dg == [("retry/**", 0), ("src/ui/*", 1)], dg
+    checks.append("Downgrade paths parses glob=level; level 3 and malformed entries are ignored")
+    pm2 = {"entries": {"src/ui/PatientCard.kt": {"aspect": "ui_view", "crit": 3}, "src/billing/a.py": {"aspect": "money_billing", "crit": 3}}}
+    ecd = lambda paths, diff="", rp=(), d=dg: effective_criticality(risk_from_diff(diff, "".join(f"3\t0\t{x}\n" for x in paths), list(rp), d), pm2, list(rp), "", None, d)
+    assert ecd(["src/ui/PatientCard.kt"])["level"] == 1 and ecd(["src/ui/PatientCard.kt"], d=[])["level"] == 3
+    checks.append("a human downgrade lowers a mapped level-3 path; without it the level stays 3")
+    assert ecd(["src/ui/PatientCard.kt"], rp=["src/ui/*"])["level"] == 3
+    checks.append("a Risk paths match still wins over a downgrade")
+    assert ecd(["src/billing/a.py"])["level"] == 3
+    checks.append("an entry cannot lower a path it does not match")
+    assert human_downgrades("- **Downgrade paths** (x): evidence/**=0") == [("evidence/**", 0)]
+    assert human_downgrades("- **Downgrade paths** (x): (inferred) evidence/**=0") == [] and human_downgrades("- **Downgrade paths** (x):\n") == []
+    checks.append("an inferred or empty Downgrade paths value grants nothing")
+    kept = drop_downgraded("diff --git a/retry/x.log b/retry/x.log\n+password reset migration\ndiff --git a/src/a.py b/src/a.py\n+x = 1\n", dg)
+    assert "retry/x.log" not in kept and "src/a.py" in kept
+    leak = "diff --git a/retry/x.log b/retry/x.log\n+API_KEY=abc123def456\n"
+    assert drop_downgraded(leak, dg) == leak
+    checks.append("a downgraded file's diff is dropped, unless it adds a secret-shaped value")
+    # ---- mutation tests: a change that should not matter must not escalate, one that should must
+    def mut(path, diff):
+        r = risk_from_diff(f"diff --git a/{path} b/{path}\n" + diff, f"1\t1\t{path}\n", [])
+        return effective_criticality(r, None, [], "", None)["level"]
+    assert mut("docs/a.md", "+Fixes a critical auth vulnerability in the password flow\n") == 0
+    assert mut("docs/a.md", "+ALTER TABLE users DROP COLUMN pw;\n") == 3
+    checks.append("mutation: prose that mentions auth/password stays 0; a schema statement in prose escalates to 3")
+    assert mut("src/Pay.kt", '+val k = "sk_' + 'live_4eC39HqLyjWDarjtT1zdp7dc"\n') == 3
+    assert mut("src/Gh.kt", '+val t = "ghp_' + "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8" + '"\n') == 3
+    checks.append("mutation: a fake Stripe or GitHub token escalates to 3")
+    assert mut("src/Api.kt", "-    require(user.isAdmin)\n") == 3 and mut("src/Cam.kt", "-@RequiresPermission(Manifest.permission.CAMERA)\n") == 3
+    assert mut("src/test/ApiTest.kt", "-    require(user.isAdmin)\n") < 3
+    checks.append("mutation: removing a guard or permission annotation escalates to 3 (in a test file it does not)")
+    assert mut("retry/result.json", "+migration permission patient\n") == 0 and mut("app/build/out.log", "+password reset token\n") == 0
+    checks.append("mutation: noise words in a result report or log stay 0")
     seq = [order(wanted("reviewer", c, 0, 0, False)) for c in ("docs", "low", "medium", "high")]
     assert seq == sorted(seq)
     checks.append("reviewer cost never goes down as criticality goes up")
@@ -393,7 +488,8 @@ def main() -> None:
         print(json.dumps(doc, indent=2))
     elif a.command == "risk":
         profile = read(cwd / ".agents" / "PROJECT_PROFILE.md")
-        print(json.dumps(measure_risk(cwd, [p.strip() for p in re.split(r"[,;]", profile_field(profile, "Risk paths") or "") if p.strip()]), indent=2))
+        print(json.dumps(measure_risk(cwd, [p.strip() for p in re.split(r"[,;]", profile_field(profile, "Risk paths") or "") if p.strip()],
+                                      human_downgrades(profile)), indent=2))
     elif a.command == "route":
         if a.role not in ("helper", "runner", "builder", "test-designer", "reviewer", "second-reviewer"):
             sys.exit("--role must be helper|runner|builder|test-designer|reviewer|second-reviewer")
