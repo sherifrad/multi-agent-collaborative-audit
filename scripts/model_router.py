@@ -144,7 +144,7 @@ def effective_criticality(risk: Dict[str, Any], pmap: Optional[Dict[str, Any]], 
     parts = {"kind": max(kind_crit, declared), "map": map_crit, "diff": diff_crit}
     level = max(parts.values()) if paths else max(1, declared, diff_crit)
     return {"level": level, "class": CRIT_CLASS[level], "kind": kind, "declared_kind": declared_kind or None, "parts": parts,
-            "map": "PROJECT_MAP.json" if pmap else "not scanned: path names only"}
+            "map": "project map" if pmap else "not scanned: path names only"}
 
 
 # ------------------------------------------------------------------ routing
@@ -220,7 +220,8 @@ def route(role: str, cwd: Path, signals: Dict[str, Any], discover: Optional[Dict
     profile = read(cwd / ".agents" / "PROJECT_PROFILE.md")
     risk_paths = [p.strip() for p in re.split(r"[,;]", profile_field(profile, "Risk paths") or "") if p.strip() and "inferred" not in p.lower()]
     diff_risk = signals.get("risk") or measure_risk(cwd, risk_paths)
-    crit = effective_criticality(diff_risk, project_map.load_map(cwd), risk_paths, signals.get("kind", ""), signals.get("paths"))
+    saved = project_map.load_map(cwd)   # no saved map: scan in memory, read-only; never fall back to names alone
+    crit = effective_criticality(diff_risk, saved or project_map.scan(cwd), risk_paths, signals.get("kind", ""), signals.get("paths"))
     risk = dict(diff_risk, diff_class=diff_risk["class"], criticality=crit)
     risk["class"] = crit["class"]
     want = wanted(role, risk["class"], signals.get("failures", 0), signals.get("blockers", 0), signals.get("full_path", False))
