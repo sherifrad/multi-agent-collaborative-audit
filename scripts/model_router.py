@@ -159,6 +159,7 @@ def untracked_as_diff(cwd: Path, limit: int = 200, downgrades: Optional[list] = 
             continue
         if project_map.downgrade_for(rel, downgrades) is not None and not any(SECRET_SHAPE.search(l) for l in lines):
             continue   # a human downgraded this path; only a secret-shaped value still counts
+        diff.append(f"diff --git a/{rel} b/{rel}")   # header lets the per-file prose and downgrade rules apply to new files
         diff.extend("+" + l for l in lines)
     return "\n".join(diff) + "\n", "\n".join(numstat) + "\n"
 
