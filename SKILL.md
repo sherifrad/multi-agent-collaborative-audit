@@ -144,7 +144,8 @@ in the ledger's debt table. After each lane: Tier 0-1 checks on what it touched.
 **Phase 3 - Independent audit (testing mode, max 2 rounds).** The reviewer audits the diff against the spec
 and call-chain map and classifies findings Hard Blocker / Deferred Shortcut / Pass in the ledger. Each round
 leaves one `REVIEW:` record in the ledger (author, reviewer, independence level, evidence, verdict); the
-referee accepts a review only through that record, and only when reviewer and author differ. A fix for a Hard
+referee accepts a review only through that record, only when reviewer and author differ, and only when `evidence=` is a saved
+file (for example `.agents/review-r1.md`, not a sentence). `independence=multi-vendor` needs real output under `.agents/fleet-runs/`. A fix for a Hard
 Blocker gets its own re-review (round 2); if you cannot get one, say in the report that the fix was not
 re-reviewed. After round 2,
 unresolved disagreements go to the user with both positions.

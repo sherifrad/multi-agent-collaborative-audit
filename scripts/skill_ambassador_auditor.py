@@ -40,7 +40,8 @@ DESIGN_LINTER_PATH = SCRIPT_DIR / "lint_design_and_ux.py"
 CACHE_PATH = SCRIPT_DIR / "impact_and_cache.py"
 
 INDEPENDENCE = {"multi-vendor", "same-family", "single-model", "same-model"}
-NON_HUMAN = {"ai", "agent", "assistant", "orchestrator", "claude", "unattended", "assumed", "auto", "self", "none", ""}
+NON_HUMAN = {"ai", "agent", "assistant", "orchestrator", "claude", "unattended", "assumed", "auto", "self", "none", "",
+             "gemini", "codex", "opencode", "agy", "gpt", "opus", "sonnet", "haiku", "llm", "bot", "ci", "subagent", "reviewer", "builder", "tester"}
 UI_WORDS = {"ui", "web", "web-app", "mobile", "android", "ios", "frontend", "compose"}
 VENDORS = ("opencode", "codex", "gemini", "agy")  # claude is the local family; it needs no vendor approval
 
@@ -78,6 +79,15 @@ def profile_field(profile: str, name: str) -> str:
     m = re.search(r"\*\*%s\*\*(?:\s*\([^)\n]*\))?[^\n:]*:[ \t]*(.*)" % re.escape(name), profile)
     val = m.group(1).strip() if m else ""
     return "" if is_placeholder(re.sub(r"\(inferred[^)]*\)", "", val)) else val
+
+
+def confirmed_names(profile: str, name: str) -> Set[str]:
+    """Names listed in a profile field. Inferred values grant nothing, so an inferred list is empty."""
+    raw = profile_field(profile, name)
+    if re.search(r"inferred", raw, re.I):
+        return set()
+    raw = re.split(r"\b(?:not|no|never|except|without|unless)\b", raw, maxsplit=1, flags=re.I)[0]
+    return {t.lower() for t in re.split(r"[,;/\s|]+", re.sub(r"\(.*?\)", "", raw)) if re.fullmatch(r"[A-Za-z][\w.-]*", t)} - {"none", "n", "a", "na"}
 
 
 def is_placeholder(text: str) -> bool:
@@ -126,8 +136,17 @@ def check_reviews(ws: Path, ledger: str, findings) -> None:
         ev = r.get("evidence", "")
         if not ev:
             problems.append(f"{rid}: no evidence")
-        elif re.fullmatch(r"[\w./-]+\.\w+", ev) and not (ws / ev).exists() and not (ws / ".agents" / ev).exists():
-            problems.append(f"{rid}: evidence file '{ev}' does not exist")
+        else:
+            cand = [q for q in (ws / ev, ws / ".agents" / ev) if q.is_file()]
+            is_cmd = bool(re.match(r"(?:node|python3?|pytest|npm|npx|cargo|go|bash|sh|\./\S+)\s", ev))
+            if cand:
+                inside = str(cand[0].resolve()).startswith(str(ws.resolve()))
+                if not inside or cand[0].stat().st_size < 10:
+                    problems.append(f"{rid}: evidence file '{ev}' is outside the workspace or empty")
+            elif not is_cmd:
+                problems.append(f"{rid}: evidence '{ev[:40]}' is neither an existing file nor a command that was run")
+        if r.get("independence", "") == "multi-vendor" and not (ws / ".agents" / "fleet-runs").exists():
+            problems.append(f"{rid}: independence=multi-vendor but there is no .agents/fleet-runs/ output")
     last = reviews[-1]
     if last.get("verdict", "") not in {"pass", "deferred"}:
         problems.append(f"latest review {last.get('id','?')} verdict is '{last.get('verdict','?')}', not pass/deferred")
@@ -137,14 +156,14 @@ def check_reviews(ws: Path, ledger: str, findings) -> None:
     gate(findings, "S2", "Independent review", "PASS", f"{len(reviews)} review record(s), independence: {', '.join(levels)}")
 
 
-def oracles_without_test(ws: Path) -> List[str]:
+def oracles_without_test(ws: Path, deferred_ids: Set[str] = frozenset()) -> List[str]:
     spec = read(ws / ".agents" / "SPEC_AND_AUDIT.md")
     ids = [m.group(1).upper() for m in re.finditer(r"^\s*(?:[-*]\s*)?`?(ORACLE-\w+)`?:\s*(.+)$", spec, re.M) if not is_placeholder(m.group(2))]
     try:
         tests = json.loads(read(ws / ".agents" / "TEST_MANIFEST.json")).get("tests", [])
     except ValueError:
         return []
-    covered = {str(c).upper() for t in tests for c in (t.get("covers") or [])}
+    covered = {str(c).upper() for t in tests if str(t.get("id")) not in deferred_ids for c in (t.get("covers") or [])}
     return [i for i in dict.fromkeys(ids) if i not in covered]
 
 
@@ -166,11 +185,17 @@ def check_tests(ws: Path, max_tier: int, findings, not_verified: List[str]) -> N
     if pending:
         ids = ", ".join(f"{t['id']} ({t['reason']})" for t in pending)
         return gate(findings, "S3", "Tests and evidence cache", "VIOLATION", f"Not yet proven fresh: {ids}")
-    uncovered = oracles_without_test(ws)
+    uncovered = oracles_without_test(ws, {str(t["id"]) for t in deferred})
     if uncovered:
         return gate(findings, "S3", "Tests and evidence cache", "VIOLATION",
                     f"No registered test declares `covers` for: {', '.join(uncovered)}. A passing suite proves nothing about an oracle no test targets.")
     reused = sum(1 for t in plan if t["action"] == "REUSE" or (t.get("always") and t.get("proven_now")))
+    if reused == 0:
+        return gate(findings, "S3", "Tests and evidence cache", "VIOLATION", "No test has a passing record on the current files.")
+    if deferred:
+        ids = ", ".join(f"{t['id']} (tier {t['tier']})" for t in deferred)
+        return gate(findings, "S3", "Tests and evidence cache", "NOT_VERIFIED",
+                    f"{reused} test(s) passed, but {ids} never ran at ceiling tier {max_tier}. Run them at close (--max-tier {max(t['tier'] for t in deferred)}) or report them as not verified.")
     gate(findings, "S3", "Tests and evidence cache", "PASS",
          f"{reused} test(s) have a passing record with identical deps; {len(deferred)} deferred above tier {max_tier} and reported as not run")
 
@@ -197,7 +222,7 @@ def check_vendors(ws: Path, profile: str, ledger: str, findings) -> None:
                     used.add(v)
     if not used:
         return gate(findings, "S5", "Vendor dispatch was approved", "NOT_APPLICABLE", "No external vendor runs recorded under .agents/fleet-runs")
-    approved = {x.strip().lower() for x in re.split(r"[,\s]+", profile_field(profile, "Approved vendors")) if x.strip()}
+    approved = confirmed_names(profile, "Approved vendors") & set(VENDORS)
     approved |= {r.get("what", "").split(":", 1)[1].lower() for r in records(ledger, "APPROVAL")
                  if r.get("what", "").lower().startswith("vendor:") and r.get("by", "").lower() not in NON_HUMAN}
     missing = sorted(used - approved)
@@ -209,7 +234,9 @@ def check_vendors(ws: Path, profile: str, ledger: str, findings) -> None:
 
 def check_ui_mock(ws: Path, ledger: str, findings) -> None:
     mocks = [p for p in (ws / ".agents" / "mocks").glob("*.*")] if (ws / ".agents" / "mocks").exists() else []
-    appr = [r for r in records(ledger, "APPROVAL") if r.get("what", "").lower() == "ui-mock" and r.get("by", "").lower() not in NON_HUMAN and r.get("date")]
+    allowed = confirmed_names(read(ws / ".agents" / "PROJECT_PROFILE.md"), "Approvals")
+    appr = [r for r in records(ledger, "APPROVAL") if r.get("what", "").lower() == "ui-mock" and r.get("by", "").lower() not in NON_HUMAN and r.get("date")
+            and (not allowed or r.get("by", "").lower() in allowed)]
     if not mocks:
         return gate(findings, "S6", "UI mock approved by a person", "VIOLATION", "No mock under .agents/mocks/")
     if not appr:
@@ -257,10 +284,11 @@ def check_linters(scan_dir: Path, domains: Optional[Set[str]], findings, not_ver
 def parse_domains(ws: Path, override: Optional[str]) -> Optional[Set[str]]:
     raw = override if override is not None else profile_field(read(ws / ".agents" / "PROJECT_PROFILE.md"), "Domains / packs")
     raw = re.sub(r"\(inferred[^)]*\)", "", raw or "")
+    raw = re.sub(r"[`*_]", "", raw)
     # only the leading list counts: stop at the first sentence break or negation ("core only. No UI, no clinical" is just core)
-    raw = re.split(r"[.;\n]|\s-\s|\b(?:no|not|without|none)\b", raw, maxsplit=1, flags=re.I)[0]
+    raw = re.split(r"[.\n]|\s-\s|\b(?:no|not|without|none)\b", raw, maxsplit=1, flags=re.I)[0]
     filler = {"only", "and", "plus", "pack", "packs", "domain", "domains"}
-    toks = {t.strip().lower() for t in re.split(r"[,/\s|]+", raw) if re.fullmatch(r"[a-z][a-z-]*", t.strip().lower())} - filler
+    toks = {t.strip().lower() for t in re.split(r"[,;/\s|]+", raw) if re.fullmatch(r"[a-z][a-z-]*", t.strip().lower())} - filler
     return toks or None
 
 
@@ -395,7 +423,7 @@ def run_self_test() -> None:
         assert any(f["gate"].startswith("S2") and f["status"] == "VIOLATION" for f in audit_workspace_compliance(ws)["findings"])
         checks.append("reviewer equal to author is rejected: PASS")
 
-        ws = root / "good"; ws.mkdir(); seed(ws, ledger=good_review, task="- [x] add todos `node t.test.js` 2026-10-31\n"); (ws / "review.md").write_text("ok"); record_pass(ws)
+        ws = root / "good"; ws.mkdir(); seed(ws, ledger=good_review, task="- [x] add todos `node t.test.js` 2026-10-31\n"); (ws / "review.md").write_text("Reviewed spec, code and tests. No blockers found."); record_pass(ws)
         r = audit_workspace_compliance(ws)
         assert r["ambassador_verdict"] == "APPROVED", r
         assert any(f["status"] == "NOT_APPLICABLE" for f in r["findings"])
@@ -413,38 +441,63 @@ def run_self_test() -> None:
         assert any(f["gate"].startswith("S3") and f["status"] == "VIOLATION" for f in r["findings"]), r
         checks.append("changed dependency makes the cached test stale again: PASS")
 
-        ws = root / "uncovered"; ws.mkdir(); seed(ws, ledger=good_review, spec=None); (ws / "review.md").write_text("ok")
+        ws = root / "uncovered"; ws.mkdir(); seed(ws, ledger=good_review, spec=None); (ws / "review.md").write_text("Reviewed spec, code and tests. No blockers found.")
         spec = (ws / ".agents" / "SPEC_AND_AUDIT.md").read_text() + "- ORACLE-2: add('') is rejected and nothing is stored\n"
         (ws / ".agents" / "SPEC_AND_AUDIT.md").write_text(spec); record_pass(ws)
         r = audit_workspace_compliance(ws)
         assert any(f["gate"].startswith("S3") and f["status"] == "VIOLATION" and "ORACLE-2" in f["detail"] for f in r["findings"]), r
         checks.append("an oracle that no registered test covers blocks the test gate: PASS")
 
-        ws = root / "prose"; ws.mkdir(); seed(ws, domains="core only. No clinical data, no UI, no auth (inferred - confirm)", ledger=good_review); (ws / "review.md").write_text("ok"); record_pass(ws)
+        ws = root / "prose"; ws.mkdir(); seed(ws, domains="core only. No clinical data, no UI, no auth (inferred - confirm)", ledger=good_review); (ws / "review.md").write_text("Reviewed spec, code and tests. No blockers found."); record_pass(ws)
         assert parse_domains(ws, None) == {"core"}, parse_domains(ws, None)
         assert audit_workspace_compliance(ws)["ambassador_verdict"] == "APPROVED"
         checks.append("prose after the domain list ('No clinical, no UI') is not read as domains: PASS")
 
-        ws = root / "tick"; ws.mkdir(); seed(ws, ledger=good_review, task="- [x] done with no proof\n"); (ws / "review.md").write_text("ok"); record_pass(ws)
+        ws = root / "deferred"; ws.mkdir(); seed(ws, ledger=good_review); (ws / "review.md").write_text("Reviewed spec, code and tests. No blockers found.")
+        m = json.loads((ws / ".agents" / "TEST_MANIFEST.json").read_text()); m["tests"][0]["tier"] = 3
+        (ws / ".agents" / "TEST_MANIFEST.json").write_text(json.dumps(m))
+        r = audit_workspace_compliance(ws, max_tier=2)
+        assert r["ambassador_verdict"] != "APPROVED" and any(f["gate"].startswith("S3") and f["status"] != "PASS" for f in r["findings"]), r
+        checks.append("a test that was deferred and never ran can not produce APPROVED: PASS")
+
+        ws = root / "inferredvendor"; ws.mkdir(); seed(ws, ledger=good_review); (ws / "review.md").write_text("Reviewed spec, code and tests. No blockers found."); record_pass(ws)
+        (ws / ".agents" / "fleet-runs" / "x" / "codex").mkdir(parents=True)
+        (ws / ".agents" / "PROJECT_PROFILE.md").write_text("- **Domains / packs** (x): core\n- **Approved vendors** (x): codex (inferred - confirm)\n")
+        assert any(f["gate"].startswith("S5") and f["status"] == "VIOLATION" for f in audit_workspace_compliance(ws)["findings"])
+        (ws / ".agents" / "PROJECT_PROFILE.md").write_text("- **Domains / packs** (x): core\n- **Approved vendors** (x): none, except codex\n")
+        assert any(f["gate"].startswith("S5") and f["status"] == "VIOLATION" for f in audit_workspace_compliance(ws)["findings"])
+        checks.append("an inferred or negated vendor entry grants no approval: PASS")
+
+        ws = root / "fmt"; ws.mkdir(); seed(ws, domains="core, `clinical`", ledger=good_review)
+        assert parse_domains(ws, None) == {"core", "clinical"}
+        seed(ws, domains="core; clinical", ledger=good_review)
+        assert parse_domains(ws, None) == {"core", "clinical"}
+        checks.append("backticks and semicolons in the Domains line do not switch gates off: PASS")
+
+        ws = root / "freetext"; ws.mkdir(); seed(ws, ledger=good_review.replace("evidence=review.md", 'evidence="I reviewed it"').replace("same-family", "multi-vendor")); record_pass(ws)
+        assert any(f["gate"].startswith("S2") and f["status"] == "VIOLATION" for f in audit_workspace_compliance(ws)["findings"])
+        checks.append("free-text review evidence and an unproven multi-vendor claim are rejected: PASS")
+
+        ws = root / "tick"; ws.mkdir(); seed(ws, ledger=good_review, task="- [x] done with no proof\n"); (ws / "review.md").write_text("Reviewed spec, code and tests. No blockers found."); record_pass(ws)
         assert any(f["gate"].startswith("S4") and f["status"] == "VIOLATION" for f in audit_workspace_compliance(ws)["findings"])
         checks.append("task ticked without command and date is rejected: PASS")
 
-        ws = root / "clinical"; ws.mkdir(); seed(ws, domains="core, clinical", ledger=good_review); (ws / "review.md").write_text("ok"); record_pass(ws)
+        ws = root / "clinical"; ws.mkdir(); seed(ws, domains="core, clinical", ledger=good_review); (ws / "review.md").write_text("Reviewed spec, code and tests. No blockers found."); record_pass(ws)
         (root / "emptydir").mkdir()
         r = audit_workspace_compliance(ws, src_dir=root / "emptydir")
         assert any(f["gate"].startswith("S7") and f["status"] == "NOT_VERIFIED" for f in r["findings"]) and r["ambassador_verdict"] != "APPROVED", r
         checks.append("applicable linter that scanned 0 files is NOT_VERIFIED, never a pass: PASS")
 
-        ws = root / "ui"; ws.mkdir(); seed(ws, domains="web-app", ledger=good_review); (ws / "review.md").write_text("ok"); record_pass(ws)
+        ws = root / "ui"; ws.mkdir(); seed(ws, domains="web-app", ledger=good_review); (ws / "review.md").write_text("Reviewed spec, code and tests. No blockers found."); record_pass(ws)
         (ws / ".agents" / "mocks").mkdir(); (ws / ".agents" / "mocks" / "m.html").write_text("<div/>")
         assert any(f["gate"].startswith("S6") and f["status"] == "VIOLATION" for f in audit_workspace_compliance(ws, src_dir=root / "emptydir")["findings"])
-        (ws / ".agents" / "AI_HANDOFF_LEDGER.md").write_text(good_review + "APPROVAL: what=ui-mock by=orchestrator date=2026-10-31\n")
+        (ws / ".agents" / "AI_HANDOFF_LEDGER.md").write_text(good_review + "APPROVAL: what=ui-mock by=gemini date=2026-10-31\n")
         assert any(f["gate"].startswith("S6") and f["status"] == "VIOLATION" for f in audit_workspace_compliance(ws, src_dir=root / "emptydir")["findings"])
         (ws / ".agents" / "AI_HANDOFF_LEDGER.md").write_text(good_review + "APPROVAL: what=ui-mock by=Dr.Sara date=2026-10-31\n")
         assert any(f["gate"].startswith("S6") and f["status"] == "PASS" for f in audit_workspace_compliance(ws, src_dir=root / "emptydir")["findings"])
         checks.append("UI mock needs approval recorded by a person, not the orchestrator: PASS")
 
-        ws = root / "vendor"; ws.mkdir(); seed(ws, ledger=good_review); (ws / "review.md").write_text("ok"); record_pass(ws)
+        ws = root / "vendor"; ws.mkdir(); seed(ws, ledger=good_review); (ws / "review.md").write_text("Reviewed spec, code and tests. No blockers found."); record_pass(ws)
         (ws / ".agents" / "fleet-runs" / "x" / "codex").mkdir(parents=True)
         assert any(f["gate"].startswith("S5") and f["status"] == "VIOLATION" for f in audit_workspace_compliance(ws)["findings"])
         (ws / ".agents" / "PROJECT_PROFILE.md").write_text("- **Domains / packs** (x): core\n- **Approved vendors** (x): codex\n")
@@ -455,13 +508,13 @@ def run_self_test() -> None:
         assert profile_field(tpl, "Approved vendors") == "" and profile_field(tpl, "Domains / packs") == "", "unedited template must not grant anything"
         checks.append("unedited profile template grants no vendor approval and no domains: PASS")
 
-        ws = root / "noprofile"; ws.mkdir(); seed(ws, ledger=good_review); (ws / "review.md").write_text("ok"); record_pass(ws)
+        ws = root / "noprofile"; ws.mkdir(); seed(ws, ledger=good_review); (ws / "review.md").write_text("Reviewed spec, code and tests. No blockers found."); record_pass(ws)
         (ws / ".agents" / "PROJECT_PROFILE.md").unlink()
         r = audit_workspace_compliance(ws)
         assert r["ambassador_verdict"] == "INCOMPLETE_NOT_VERIFIED", r
         checks.append("missing profile makes domain gates NOT_VERIFIED instead of silently skipped: PASS")
 
-        ws = root / "log"; ws.mkdir(); seed(ws, ledger=good_review); (ws / "review.md").write_text("ok"); record_pass(ws)
+        ws = root / "log"; ws.mkdir(); seed(ws, ledger=good_review); (ws / "review.md").write_text("Reviewed spec, code and tests. No blockers found."); record_pass(ws)
         lp = init_compliance_log(ws, "demo")
         audit_workspace_compliance(ws, auto_write_proof=True)
         assert "Referee proof" in lp.read_text(encoding="utf-8")
