@@ -29,7 +29,7 @@ import project_map  # noqa: E402
 TIERS = ["light", "standard", "frontier"]
 EFFORTS = ["low", "medium", "high"]
 JUDGING = {"builder", "test-designer", "reviewer", "second-reviewer"}
-SENSITIVE = re.compile(r"\b(auth\w*|token|secret|password|passwd|crypto\w*|payment|charge|refund|balance|invoice|migrat\w+|drop\s+table|permission\w*|session|jwt|exec|eval|alter\s+table|create\s+table|api[_ ]?key|private_key|client_secret)\b", re.I)
+SENSITIVE = re.compile(r"\b(auth\w*|token|secret|password|passwd|crypto\w*|payment|charge|refund|balance|invoice|migrat\w+|drop\s+table|permission\w*|session|jwt|exec|eval|alter\s+table|create\s+table|api[_ ]?key|private_key|client_secret|billing|stripe|paypal|bcrypt|argon2|hmac|csrf)\b", re.I)
 RISKY_FILES = ("migrations/", "migration", "schema", ".github/workflows/", "package-lock.json", "yarn.lock", "poetry.lock", "Cargo.lock", "go.sum", "Dockerfile", "permissions", "rbac")
 CODE_EXT = (".py", ".js", ".ts", ".tsx", ".jsx", ".kt", ".java", ".go", ".rs", ".swift", ".rb", ".php", ".c", ".cc", ".cpp", ".cs", ".sql")
 
@@ -88,7 +88,7 @@ def risk_from_diff(diff: str, numstat: str, risk_paths: List[str]) -> Dict[str, 
         parts = line.split("\t")
         if len(parts) == 3 and parts[0].isdigit() and parts[1].isdigit():
             files.append(parts[2]); added += int(parts[0])
-            if re.search(r"(^|/)(tests?|spec|__tests__)/|test_|_test\.|\.test\.|\.spec\.", parts[2]):
+            if re.search(r"(^|/)(tests?|spec|__tests__|e2e|fixtures)/|test_|_test\.|\.test\.|\.spec\.", parts[2]):
                 added_tests += int(parts[0]); removed_tests += int(parts[1])
     hits = sorted({m.group(1).lower() for l in diff.splitlines() if l.startswith("+") and not l.startswith("+++") for m in [SENSITIVE.search(l)] if m})
     risky = [f for f in files if any(r.lower() in f.lower() for r in RISKY_FILES) or any(fnmatch.fnmatch(f, g) for g in risk_paths)]
@@ -103,7 +103,7 @@ def risk_from_diff(diff: str, numstat: str, risk_paths: List[str]) -> Dict[str, 
 
 def measure_risk(cwd: Path, risk_paths: List[str]) -> Dict[str, Any]:
     base = "HEAD" if git(cwd, "rev-parse", "--verify", "HEAD").strip() else ""
-    args = ["diff", base] if base else ["diff"]
+    args = ["diff", "--no-renames", base] if base else ["diff", "--no-renames"]   # a rename must not hide a path like src/{auth => common}/
     r = risk_from_diff(git(cwd, *args, "-U0"), git(cwd, *args, "--numstat"), risk_paths)
     r["source"] = "git diff (measured by the orchestrator)"
     return r
@@ -257,6 +257,7 @@ def self_test() -> None:
     hi = risk_from_diff("+if token == secret:\n", "3\t0\tsrc/auth.py\n", [])
     assert hi["class"] == "high" and any("sensitive" in r for r in hi["reasons"])
     assert risk_from_diff("", "0\t40\ttests/test_a.py\n", [])["class"] == "high"
+    assert risk_from_diff("", "0\t150\te2e/auth.py\n", [])["class"] == "high" and risk_from_diff("+import bcrypt\n", "1\t0\tdocs/r.md\n", [])["class"] == "high"
     assert risk_from_diff("", "1\t0\tdb/migrations/001.sql\n", [])["class"] == "high"
     assert risk_from_diff("", "1\t0\tweb/x.py\n", ["web/*"])["class"] == "high"
     assert risk_from_diff("", "".join(f"10\t0\tsrc/f{i}.py\n" for i in range(5)), [])["class"] == "medium"

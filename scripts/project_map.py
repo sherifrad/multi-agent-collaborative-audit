@@ -56,14 +56,15 @@ def classify_path(rel: str) -> Dict[str, Any]:
     name = low.rsplit("/", 1)[-1]
     stem, ext = os.path.splitext(name)
     segs = set(low.split("/")[:-1])
-    tokens = segs | set(re.split(r"[._-]", stem))
+    tokens = set(re.split(r"[/._\- ]", low.rsplit(".", 1)[0] if "." in name else low))   # auth-service/ and billing_service/ count as auth and billing
+    sensitive_words = SEGMENT_RULES[0][2] | SEGMENT_RULES[1][2] | SEGMENT_RULES[2][2]
     if name.startswith(".env") or ext in (".pem", ".key", ".p12") or name in ("id_rsa",):
         return {"aspect": "auth_security", "crit": 3}
     if name.endswith((".lock", ".min.js", ".min.css")) or name in ("package-lock.json", "yarn.lock", "poetry.lock", "go.sum", "cargo.lock", "pnpm-lock.yaml"):
         return {"aspect": "dependencies", "crit": 1}
     if re.search(r"(^|/)(test_[^/]*|[^/]*_test\.[^/]*|[^/]*\.(test|spec)\.[^/]*)$", low):
         return {"aspect": "tests", "crit": 1}
-    if name in ("license", "licence", "changelog") or ext in DOC_EXT and not (segs & {"migrations", "auth", "billing"}):
+    if name in ("license", "licence", "changelog") or ext in DOC_EXT and not (tokens & sensitive_words):
         return {"aspect": "docs", "crit": 0}
     for aspect, crit, words in SEGMENT_RULES:
         if tokens & words:
@@ -100,7 +101,7 @@ def fix_counts(cwd: Path) -> Optional[Dict[str, int]]:
         return None
     if git_out(cwd, "rev-parse", "--is-shallow-repository").strip() == "true":
         return None
-    log = git_out(cwd, "log", "--since=180.days", "--no-merges", "--pretty=format:@@%s", "--name-only")
+    log = git_out(cwd, "log", "--since=180.days", "--no-merges", "--relative", "--pretty=format:@@%s", "--name-only")
     counts: Counter = Counter()
     fix = False
     for line in log.splitlines():
@@ -119,6 +120,7 @@ def scan(cwd: Path, previous: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
         dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
         for f in sorted(files):
             if n >= MAX_FILES:
+                dirs.clear()
                 break
             full = Path(root) / f
             rel = full.relative_to(cwd).as_posix()
@@ -128,6 +130,9 @@ def scan(cwd: Path, previous: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
                 continue
             n += 1
             old = cached.get(rel)
+            if old and "git" in old:   # a git boost is recomputed each scan, never carried over
+                old = {k: v for k, v in old.items() if k != "git"}
+                old["crit"] -= 1
             if old and old.get("mtime") == int(st.st_mtime) and old.get("size") == st.st_size:
                 entries[rel] = old
                 continue
@@ -226,6 +231,9 @@ def self_test() -> None:
         assert lookup(m, ["docs/a.md"], ["docs/*"]) == {"docs/a.md": 3}
         assert len(summary(m).splitlines()) <= 15
     checks.append("scan works without git, is incremental, treats unmapped paths as 2, lets Risk paths raise only, and the summary fits 15 lines")
+    assert c("services/auth-service/login.py") == 3 and c("src/billing_service/worker.py") == 3
+    assert c("docs/security.md") == 3 and c("SECURITY.md") != 0 and c("payments/setup.md") == 3 and c("docs/guide.md") == 0
+    checks.append("hyphen/underscore directory names and sensitive docs (security.md, payments/) are not demoted")
     print(json.dumps({"self_test_status": "PASS", "checks_executed": len(checks), "details": checks}, indent=2))
 
 
