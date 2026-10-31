@@ -56,12 +56,16 @@ def seed_entry(vendor: str, model_id: str) -> Dict[str, Any]:
             "source": "inferred"}
 
 
+NON_CODING = re.compile(r"(embedding|tts|image|live|lyria|deep-research|computer-use|translate|omni|audio|video|vl\b|-vl-|auto-review)", re.I)
+
+
 def seed_catalog(discover: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
     out = [dict(seed_entry("claude", a), source="builtin") for a in ("haiku", "sonnet", "opus", "fable")]   # Claude Code aliases are documented, not guessed
     for d in (discover or {}).get("discovered", []):
         for v in ((d.get("models") or {}).get("values") or []):
-            if d["key"] != "claude":
-                out.append(seed_entry(d["key"], v))
+            mid = v.split()[0] if v.split() else v   # `agy models` prints "id<TAB>Label"; keep the id
+            if d["key"] != "claude" and not NON_CODING.search(mid):
+                out.append(seed_entry(d["key"], mid))
     return out
 
 
@@ -282,6 +286,9 @@ def self_test() -> None:
     assert wanted("builder", "low", 2, 0, False) == {"tier": "standard", "effort": "high", "why": wanted("builder", "low", 2, 0, False)["why"]}
     assert wanted("builder", "low", 3, 0, False)["tier"] == "frontier" and wanted("reviewer", "low", 0, 1, False)["tier"] == "frontier"
     checks.append("escalation: effort first, then tier; a Hard Blocker sends builder and reviewer to frontier")
+    assert [e["id"] for e in seed_catalog({"discovered": [{"key": "agy", "models": {"values": ["gemini-4-argon-high\tGemini 4 Argon (High)", "x-embedding-2", "g/gemini-3.1-flash-tts-preview"]}}]})
+            if e["vendor"] == "agy"] == ["gemini-4-argon-high"]
+    checks.append("catalog seeding keeps the model id (not its label) and drops embedding, speech, image and other non-coding models")
     cat = [seed_entry("claude", a) for a in ("haiku", "sonnet", "opus")] + [seed_entry("agy", "gemini-3.8-flash-high"), seed_entry("agy", "gemini-4-argon-high")]
     cat[2]["source"] = "confirmed"
     avail = {"agy": "google"}
