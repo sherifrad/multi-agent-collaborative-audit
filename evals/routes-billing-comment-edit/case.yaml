@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: routes-billing-comment-edit
+expected_outcome: |
+  A comment-only edit inside a billing path is still level 3 from the project map: the reviewer is frontier tier, high effort, even though the diff itself is harmless.
+context:
+  scaffold_script: place-files.sh

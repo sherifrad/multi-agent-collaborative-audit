@@ -30,6 +30,7 @@ TIERS = ["light", "standard", "frontier"]
 EFFORTS = ["low", "medium", "high"]
 JUDGING = {"builder", "test-designer", "reviewer", "second-reviewer"}
 SENSITIVE = re.compile(r"\b(auth\w*|token|secret|password|passwd|crypto\w*|payment|charge|refund|balance|invoice|migrat\w+|drop\s+table|permission\w*|session|jwt|exec|eval|alter\s+table|create\s+table|api[_ ]?key|private_key|client_secret|billing|stripe|paypal|bcrypt|argon2|hmac|csrf)\b", re.I)
+SECRET_SHAPE = re.compile(r"[A-Za-z0-9_]*(api[_-]?key|secret|token|passw(or)?d|private[_-]?key)[A-Za-z0-9_]*\s*[=:]\s*\S+|\bsk_(live|test)_|\bAKIA[0-9A-Z]{16}\b|-----BEGIN [A-Z ]*PRIVATE KEY", re.I)
 RISKY_FILES = ("migrations/", "migration", "schema", ".github/workflows/", "package-lock.json", "yarn.lock", "poetry.lock", "Cargo.lock", "go.sum", "Dockerfile", "permissions", "rbac")
 CODE_EXT = (".py", ".js", ".ts", ".tsx", ".jsx", ".kt", ".java", ".go", ".rs", ".swift", ".rb", ".php", ".c", ".cc", ".cpp", ".cs", ".sql")
 
@@ -91,6 +92,9 @@ def risk_from_diff(diff: str, numstat: str, risk_paths: List[str]) -> Dict[str, 
             if re.search(r"(^|/)(tests?|spec|__tests__|e2e|fixtures)/|test_|_test\.|\.test\.|\.spec\.", parts[2]):
                 added_tests += int(parts[0]); removed_tests += int(parts[1])
     hits = sorted({m.group(1).lower() for l in diff.splitlines() if l.startswith("+") and not l.startswith("+++") for m in [SENSITIVE.search(l)] if m})
+    plus_lines = [l for l in diff.splitlines() if l.startswith("+") and not l.startswith("+++")]
+    if any(SECRET_SHAPE.search(l) for l in plus_lines):
+        hits = sorted(set(hits) | {"secret-shaped value"})
     risky = [f for f in files if any(r.lower() in f.lower() for r in RISKY_FILES) or any(fnmatch.fnmatch(f, g) for g in risk_paths)]
     reasons = []
     if hits: reasons.append(f"sensitive words added: {', '.join(hits[:5])}")
@@ -259,6 +263,9 @@ def self_test() -> None:
     assert risk_from_diff("", "0\t40\ttests/test_a.py\n", [])["class"] == "high"
     assert risk_from_diff("", "0\t150\te2e/auth.py\n", [])["class"] == "high" and risk_from_diff("+import bcrypt\n", "1\t0\tdocs/r.md\n", [])["class"] == "high"
     assert risk_from_diff("", "1\t0\tdb/migrations/001.sql\n", [])["class"] == "high"
+    assert "secret-shaped value" in risk_from_diff("+STRIPE_API_KEY=sk_live_example\n", "1\t0\tdocs/n.md\n", [])["reasons"][0]
+    assert risk_from_diff("+see the api key docs\n", "1\t0\tdocs/n.md\n", [])["class"] == "high"   # words still count
+    assert risk_from_diff("+Fixed a typo\n", "1\t0\tdocs/n.md\n", [])["class"] == "low"
     assert risk_from_diff("", "1\t0\tweb/x.py\n", ["web/*"])["class"] == "high"
     assert risk_from_diff("", "".join(f"10\t0\tsrc/f{i}.py\n" for i in range(5)), [])["class"] == "medium"
     checks.append("risk is computed from the diff: sensitive words, risky files, weakened tests, profile risk_paths, size")

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: routes-disguised-docs-change
+expected_outcome: |
+  A change labelled docs-only that adds ALTER TABLE and a live API key is not treated as docs-only: the reviewer is frontier tier, high effort, and the response says the diff content, not the label, decided it.
+context:
+  scaffold_script: place-files.sh

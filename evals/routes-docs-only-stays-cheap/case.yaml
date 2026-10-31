@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: routes-docs-only-stays-cheap
+expected_outcome: |
+  A genuine docs-only change is not over-escalated: no frontier tier, no second reviewer, and the judging role is still not a light model.
+context:
+  scaffold_script: place-files.sh
