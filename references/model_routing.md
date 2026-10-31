@@ -54,6 +54,5 @@ only), `maca-helper`. The referee is a script, not a subagent. The router names 
 For light work the router prefers `opencode/*-free` models. They have a daily limit, so the chain falls back to the next candidate.
 
 ## Gemini
-There is no upstream Gemini relay. Reach Gemini models through `agy --model gemini-...`. The Gemini CLI itself supports headless
-`-p`, `--approval-mode plan` and `-m`, but plan mode is a setting, not a sandbox; if you ever add a relay, keep the upstream flags
-and `result.json` contract and add the tree-fingerprint check that `fleet_run.py` already performs.
+The standalone Gemini CLI is no longer supported for Gemini Code Assist for individuals (its sign-in now says to migrate to the Antigravity
+products), so MACA does not use it. Reach Gemini models through `agy --model gemini-...`, which the upstream agy relay supports.
