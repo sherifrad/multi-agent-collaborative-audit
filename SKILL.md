@@ -63,7 +63,7 @@ re-reviewed. If scope grows (more files, an auth, money, personal-data or safety
 
 ## 2. The team and who decides
 
-The **orchestrator** is the agent talking to the user (or the one named in `.agents/fleet.json`). It routes,
+The **orchestrator** is the agent talking to the user (or the one the user names). It routes,
 owns the spec and the ledger, enforces tier ceilings, and reports honestly. On the Full path it does not
 write the code it approves. Everyone else:
 
@@ -96,7 +96,8 @@ a blocker. Say in the report which roles were merged and why.
    dispatch code. Follow each skill's loop: write a self-contained brief, run
    `node vendor/delegate-skills/skills/<agent>-delegate/scripts/relay.mjs --brief <file> --cd <repo>`
    (add `--read-only` for review), read `result.json`, re-run the gates yourself, then you commit. Several
-   lanes at once: `scripts/fleet_review.sh`; lane config: `.agents/fleet.json`. Refresh the vendored copy from
+   lanes at once: `scripts/fleet_review.sh`. Lanes (which CLI does which kind of work) are the user's
+   `delegate-setup` config (`delegate-fleet.v1`, global or project), not a MACA file. Refresh the vendored copy from
    the official repo (`amElnagdy/delegate-skills`) before a run that depends on it. Different models give the
    most independent review.
 2. **Platform subagents**, one per role, each with a clean context.
@@ -106,9 +107,11 @@ Run `bash ./scripts/bootstrap.sh` once per repo to detect what is available (cac
 reports missing tools, show the user a short table (tool, impact, install command) and continue one tier
 down; never fail silently.
 
-**Fleet check is mandatory before any dispatch (Phase 0).** Run `bash scripts/fleet_review.sh --detect` (and
-`fleet_dispatch.py --detect-only`) and print a one-line fleet table: which vendor CLIs are installed
-(opencode, codex, gemini, agy, claude). Then state the review's independence level in the first status
+**Fleet selection is mandatory before any dispatch (Phase 0).** Run `python3 scripts/fleet_select.py --cwd <repo>`. It reads
+the installed CLIs, the user's lanes (through `delegate-setup`) and the profile's `Approved vendors` and
+`Write-lane permissions`, then prints the user's archetype (solo, pair or fleet), a role assignment, the best
+independence level reachable, and each withheld vendor with the exact fix; print that as a short table
+(`references/fleet_profiles.md`). It never dispatches or writes. Then state the review's independence level in the first status
 line: *multi-vendor* (2+ model families), *same-family* (only Claude subagents), or *single-model*. A
 sandbox shell often cannot see CLIs installed on the user's own machine; if the profile expects a fleet and
 none is visible, do not quietly fall back. Write one identical brief file, give the user the exact
@@ -116,7 +119,7 @@ none is visible, do not quietly fall back. Write one identical brief file, give 
 their terminal, and carry on with the Claude subagent review meanwhile. Merge the vendor outputs when they
 arrive: a finding raised by 2+ families is strong evidence, a finding raised by one is labelled as such.
 Send code and specs only to vendors named in the profile's `Approved vendors` or in a human `APPROVAL:
-what=vendor:<name>` ledger record. A lane listed in `fleet.json` is configuration, not approval. With no
+what=vendor:<name>` ledger record. A lane in the delegate-setup config is configuration, not approval. With no
 recorded approval, use a local subagent or fresh process and say so. Keep personal data (customer or patient rows, names,
 identifiers, secrets) out of every brief: describe a fixture, never paste it. `scripts/lane_fallback.py` runs
 one lane through a chain of fallback models; a writing lane (one allowed to edit files) needs the profile's

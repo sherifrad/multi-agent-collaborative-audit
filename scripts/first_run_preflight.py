@@ -61,6 +61,8 @@ REQUIRED_INTERNAL_FILES = [
     "scripts/harness.py",
     "scripts/lane_fallback.py",
     "scripts/fleet_review.sh",
+    "scripts/fleet_select.py",
+    "references/fleet_profiles.md",
     "packs/clinical/SPEC_AND_LEDGER_SECTIONS.md",
     "resources/templates/PROJECT_PROFILE.template.md",
     "resources/templates/TEST_MANIFEST.template.json",
@@ -219,6 +221,7 @@ def run_internal_script_selftests() -> List[Dict[str, Any]]:
         ("impact_and_cache.py", [sys.executable, str(SCRIPT_DIR / "impact_and_cache.py"), "--self-test"]),
         ("harness.py", [sys.executable, str(SCRIPT_DIR / "harness.py"), "--self-test"]),
         ("lane_fallback.py", [sys.executable, str(SCRIPT_DIR / "lane_fallback.py"), "--self-test"]),
+        ("fleet_select.py", [sys.executable, str(SCRIPT_DIR / "fleet_select.py"), "--self-test"]),
     ]
     for name, cmd in py_scripts:
         tasks.append({
