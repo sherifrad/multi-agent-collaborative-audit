@@ -34,7 +34,7 @@ MAX_READ = 16384
 SEGMENT_RULES = [
     ("data_schema", 3, {"migrations", "migration", "migrate", "alembic", "schema", "schemas"}),
     ("auth_security", 3, {"auth", "authentication", "authorization", "oauth", "security", "crypto", "secrets", "permissions", "rbac", "acl", "iam", "sso", "keystore", "keystores", "vault", "biometric", "credentials", "credential", "signing"}),
-    ("clinical_safety", 3, {"patient", "patients", "clinical", "dosage", "dose", "medication", "diagnosis", "gestational", "gestation", "obstetric", "pregnancy", "triage", "redating", "emr", "ehr", "phi", "hipaa"}),
+    ("clinical_safety", 3, {"patient", "patients", "clinical", "dosage", "dose", "medication", "diagnosis", "gestational", "gestation", "obstetric", "pregnancy", "triage", "redating", "dating", "vitals", "emr", "ehr", "phi", "hipaa"}),
     ("money_billing", 3, {"billing", "payments", "payment", "checkout", "invoice", "invoices", "ledger", "stripe", "wallet"}),
     ("api_integration", 2, {"api", "routes", "controllers", "handlers", "endpoints", "clients", "integrations", "webhooks", "rpc"}),
     ("data_access", 2, {"db", "database", "models", "repositories", "repository", "dao", "queries"}),

@@ -109,11 +109,29 @@ def risk_from_diff(diff: str, numstat: str, risk_paths: List[str]) -> Dict[str, 
     return {"class": cls, "files": len(files), "lines_added": added, "reasons": reasons, "paths": files}
 
 
+def untracked_as_diff(cwd: Path, limit: int = 200) -> "tuple[str, str]":
+    """New files are invisible to `git diff`. Treat each untracked text file as fully added so a new auth or clinical file is scored."""
+    diff, numstat = [], []
+    for rel in git(cwd, "ls-files", "--others", "--exclude-standard").splitlines()[:limit]:
+        try:
+            f = cwd / rel
+            if f.stat().st_size > 200_000:
+                numstat.append(f"1\t0\t{rel}"); continue
+            text = f.read_text(errors="strict")
+        except (OSError, UnicodeDecodeError):
+            numstat.append(f"1\t0\t{rel}"); continue
+        lines = text.splitlines()
+        numstat.append(f"{len(lines)}\t0\t{rel}")
+        diff.extend("+" + l for l in lines)
+    return "\n".join(diff) + "\n", "\n".join(numstat) + "\n"
+
+
 def measure_risk(cwd: Path, risk_paths: List[str]) -> Dict[str, Any]:
     base = "HEAD" if git(cwd, "rev-parse", "--verify", "HEAD").strip() else ""
     args = ["diff", "--no-renames", base] if base else ["diff", "--no-renames"]   # a rename must not hide a path like src/{auth => common}/
-    r = risk_from_diff(git(cwd, *args, "-U0"), git(cwd, *args, "--numstat"), risk_paths)
-    r["source"] = "git diff (measured by the orchestrator)"
+    new_diff, new_stat = untracked_as_diff(cwd)
+    r = risk_from_diff(git(cwd, *args, "-U0") + new_diff, git(cwd, *args, "--numstat") + new_stat, risk_paths)
+    r["source"] = "git diff + untracked files (measured by the orchestrator)"
     return r
 
 
@@ -328,6 +346,12 @@ def self_test() -> None:
     checks.append("unmapped path is level 2; a declared kind only raises; no diff yet is level 1; no map falls back to name rules")
     assert ec([], planned=["src/billing/a.py"])["level"] == 3
     checks.append("planned paths count before a diff exists")
+    import tempfile
+    with tempfile.TemporaryDirectory() as t:
+        subprocess.run(["git", "init", "-q", t]); (Path(t) / "src").mkdir(); (Path(t) / "src" / "login.py").write_text("token = make_jwt(password)\n")
+        nd, ns = untracked_as_diff(Path(t))
+        assert "src/login.py" in ns and risk_from_diff(nd, ns, [])["class"] == "high"
+    checks.append("a brand-new untracked file is scored like an added file (git diff alone would not see it)")
     seq = [order(wanted("reviewer", c, 0, 0, False)) for c in ("docs", "low", "medium", "high")]
     assert seq == sorted(seq)
     checks.append("reviewer cost never goes down as criticality goes up")
