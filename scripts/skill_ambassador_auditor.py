@@ -42,7 +42,28 @@ CACHE_PATH = SCRIPT_DIR / "impact_and_cache.py"
 INDEPENDENCE = {"multi-vendor", "same-family", "single-model", "same-model"}
 NON_HUMAN = {"ai", "agent", "assistant", "orchestrator", "claude", "unattended", "assumed", "auto", "self", "none", "",
              "gemini", "codex", "opencode", "agy", "gpt", "opus", "sonnet", "haiku", "llm", "bot", "ci", "subagent", "reviewer", "builder", "tester"}
-UI_WORDS = {"ui", "web", "web-app", "mobile", "android", "ios", "frontend", "compose"}
+PACKS_DIR = SCRIPT_DIR.parent / "packs"
+
+
+def load_packs() -> List[Dict[str, Any]]:
+    out = []
+    for f in sorted(PACKS_DIR.glob("*/pack.json")):
+        try:
+            out.append(json.loads(f.read_text(encoding="utf-8")))
+        except ValueError:
+            continue
+    return out
+
+
+def ui_words() -> Set[str]:
+    return {d for p in load_packs() if p.get("ui_domains") for d in p.get("domains", [])}
+
+
+def known_domains() -> Set[str]:
+    names = {"core"} | {p.stem for p in PACKS_DIR.glob("*.md")} | {d.name for d in PACKS_DIR.iterdir() if d.is_dir()}
+    for p in load_packs():
+        names |= set(p.get("domains", []))
+    return names - {"INDEX"} - {"index"}
 VENDORS = ("opencode", "codex", "gemini", "agy")  # claude is the local family; it needs no vendor approval
 
 
@@ -250,21 +271,27 @@ def run_linter(path: Path, scan_dir: Path):
 
 
 def check_linters(scan_dir: Path, domains: Optional[Set[str]], findings, not_verified: List[str]) -> None:
-    names = [("S7", "Clinical safety invariants linter", SAMD_LINTER_PATH, "clinical"),
-             ("S8", "Design and UX linter", DESIGN_LINTER_PATH, "ui")]
+    names = [(g["id"], g["name"], SCRIPT_DIR.parent / g["script"], ",".join(g.get("applies_when", [])), set(g.get("applies_when", [])))
+             for p in load_packs() for g in p.get("gates", [])]
+    names.sort(key=lambda n: n[0])
+    unknown = sorted(domains - known_domains()) if domains else []
+    if unknown:
+        gate(findings, "S9", "Unknown domains in the profile", "NOT_VERIFIED",
+             f"No pack is installed for: {', '.join(unknown)}. Install the pack or remove the name; its checks cannot run.")
+        not_verified.append(f"domain(s) without a pack: {', '.join(unknown)}")
     if domains is None:
-        for gid, name, _, _ in names:
+        for gid, name, _, _, _ in names:
             gate(findings, gid, name, "NOT_VERIFIED", "No project profile and no --domains: cannot tell whether this gate applies. Pass --domains core,clinical,ui or write the profile.")
         return
-    wanted = [(g, n, p, k) for g, n, p, k in names if (k == "clinical" and "clinical" in domains) or (k == "ui" and domains & UI_WORDS)]
-    for gid, name, _, kind in names:
+    wanted = [(g, n, p, k, w) for g, n, p, k, w in names if domains & w]
+    for gid, name, _, kind, _ in names:
         if not any(g == gid for g, *_ in wanted):
             gate(findings, gid, name, "NOT_APPLICABLE", f"Domain '{kind}' is not in the project's packs ({', '.join(sorted(domains)) or 'none'})")
     if not wanted:
         return
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(wanted)) as ex:
-        futs = {gid: ex.submit(run_linter, path, scan_dir) for gid, _, path, _ in wanted}
-    for gid, name, _, _ in wanted:
+        futs = {gid: ex.submit(run_linter, path, scan_dir) for gid, _, path, _, _ in wanted}
+    for gid, name, _, _, _ in wanted:
         proc = futs[gid].result()
         try:
             data = json.loads(proc.stdout)
@@ -323,7 +350,7 @@ def audit_workspace_compliance(ws: Path, domains_override: Optional[str] = None,
     check_vendors(ws, profile, ledger, findings)
     if domains is None:
         gate(findings, "S6", "UI mock approved by a person", "NOT_VERIFIED", "Domains unknown (no profile, no --domains), so UI applicability is undecided.")
-    elif domains & UI_WORDS:
+    elif domains & ui_words():
         check_ui_mock(ws, ledger, findings)
     else:
         gate(findings, "S6", "UI mock approved by a person", "NOT_APPLICABLE", f"No UI domain in packs ({', '.join(sorted(domains))})")
@@ -397,13 +424,13 @@ def run_self_test() -> None:
         (ws / "src").mkdir(exist_ok=True)
         (ws / "src" / "t.js").write_text("exports.a = 1\n", encoding="utf-8")
         (ws / "t.test.js").write_text("// t\n", encoding="utf-8")
-        (a / "TEST_MANIFEST.json").write_text(json.dumps({"tests": [{"id": "UNIT-t", "tier": 1, "cmd": "node t.test.js", "deps": ["src/t.js", "t.test.js"], "covers": ["ORACLE-1"]}]}), encoding="utf-8")
+        (a / "TEST_MANIFEST.json").write_text(json.dumps({"tests": [{"id": "UNIT-t", "tier": 1, "cmd": "python3 -c pass", "deps": ["src/t.js", "t.test.js"], "covers": ["ORACLE-1"]}]}), encoding="utf-8")
         if task:
             (ws / "tasks").mkdir(exist_ok=True)
             (ws / "tasks" / "current_task.md").write_text(task, encoding="utf-8")
 
     def record_pass(ws: Path):
-        subprocess.run([sys.executable, str(CACHE_PATH), "record", "--ws", str(ws), "--id", "UNIT-t", "--status", "pass", "--note", "selftest"], check=True, capture_output=True)
+        subprocess.run([sys.executable, str(CACHE_PATH), "run", "--ws", str(ws), "--id", "UNIT-t"], check=True, capture_output=True)
 
     good_review = "REVIEW: id=R-1 author=builder-a reviewer=reviewer-b independence=same-family round=1 evidence=review.md verdict=pass\n"
 
@@ -452,6 +479,16 @@ def run_self_test() -> None:
         assert parse_domains(ws, None) == {"core"}, parse_domains(ws, None)
         assert audit_workspace_compliance(ws)["ambassador_verdict"] == "APPROVED"
         checks.append("prose after the domain list ('No clinical, no UI') is not read as domains: PASS")
+
+        ws = root / "unknowndom"; ws.mkdir(); seed(ws, domains="core, medical-imaging", ledger=good_review); (ws / "review.md").write_text("Reviewed spec, code and tests. No blockers found."); record_pass(ws)
+        r = audit_workspace_compliance(ws)
+        assert any(f["gate"].startswith("S9") and f["status"] == "NOT_VERIFIED" for f in r["findings"]) and r["ambassador_verdict"] != "APPROVED", r
+        checks.append("a domain with no installed pack is NOT_VERIFIED, never silently skipped: PASS")
+
+        ws = root / "byhand"; ws.mkdir(); seed(ws, ledger=good_review); (ws / "review.md").write_text("Reviewed spec, code and tests. No blockers found.")
+        subprocess.run([sys.executable, str(CACHE_PATH), "record", "--ws", str(ws), "--id", "UNIT-t", "--status", "pass"], check=True, capture_output=True)
+        assert any(f["gate"].startswith("S3") and f["status"] == "VIOLATION" for f in audit_workspace_compliance(ws)["findings"])
+        checks.append("a test pass typed in by hand (not produced by `run`) is not evidence: PASS")
 
         ws = root / "deferred"; ws.mkdir(); seed(ws, ledger=good_review); (ws / "review.md").write_text("Reviewed spec, code and tests. No blockers found.")
         m = json.loads((ws / ".agents" / "TEST_MANIFEST.json").read_text()); m["tests"][0]["tier"] = 3

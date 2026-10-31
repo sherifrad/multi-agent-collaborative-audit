@@ -59,7 +59,7 @@ plus at most one `review.md` holding the diff, the reviewer's brief and its outp
 brief files); no `.agents/` files, task queue,
 compliance log or referee. Give the reviewer spec + diff inline, never your reasoning. Still required: a reviewer that did
 not write the code, and tests you actually ran. Fix real defects it finds, and say if a fix was not
-re-reviewed. If scope grows (more files, an auth/data/clinical touch), switch to Full and say why.
+re-reviewed. If scope grows (more files, an auth, money, personal-data or safety-rule touch), switch to Full and say why.
 
 ## 2. The team and who decides
 
@@ -113,7 +113,7 @@ their terminal, and carry on with the Claude subagent review meanwhile. Merge th
 arrive: a finding raised by 2+ families is strong evidence, a finding raised by one is labelled as such.
 Send code and specs only to vendors named in the profile's `Approved vendors` or in a human `APPROVAL:
 what=vendor:<name>` ledger record. A lane listed in `fleet.json` is configuration, not approval. With no
-recorded approval, use a local subagent or fresh process and say so. Keep personal data (patient rows, names,
+recorded approval, use a local subagent or fresh process and say so. Keep personal data (customer or patient rows, names,
 identifiers, secrets) out of every brief: describe a fixture, never paste it. `scripts/lane_fallback.py` runs
 one lane through a chain of fallback models; a writing lane (one allowed to edit files) needs the profile's
 `Write-lane permissions` to name it, otherwise run it read-only.
@@ -155,7 +155,7 @@ unresolved disagreements go to the user with both positions.
 
 ```
 python3 scripts/impact_and_cache.py select --ws <ws> --max-tier 2     # shows RUN / REUSE / DEFER
-# run only RUN lines; after each: impact_and_cache.py record --ws <ws> --id <id> --status pass|fail
+# run only RUN lines, each through: impact_and_cache.py run --ws <ws> --id <id>   (it executes the manifest cmd and records the real exit code; a pass typed in with `record` is not evidence)
 ```
 
 Passed tests are reused only when a hash of everything they depend on is unchanged; failed tests, tests
@@ -163,14 +163,14 @@ marked `always`, and tests with unmatched `deps` always run; tests above the tie
 *not run*, never as passed. Do not also run the whole suite "to be safe" in the same round: it spends what the cache saved and contradicts
 any reuse claim. If you do run extra tests, `record` them and drop the reuse claim for those tests. Show the plan line to the user (`Ran 6 | Reused 14 | Deferred 3`) and raise the
 ceiling when risk demands it (changed safety rule, auth, migration). Verification principles, which apply
-to every test you do run, are in `references/verification_principles.md`; stack recipes for Android/clinical
+to every test you do run, are in `references/verification_principles.md`; stack recipes for the stacks you use (Android/clinical ones live in their packs)
 are in `references/e2e_and_call_chain_testing.md`. For auth changes only a verified identity claim may grant
 admin, so a username-only match must be rejected (`scenario_and_callchain_engine.py --auth-fuzz-matrix`).
 
 **Phase 5 - Close.** If `.agents/PROJECT_PROFILE.md` is missing, do intake first (or infer it and mark each
 guess `(inferred - confirm)`): the referee cannot tell which gates apply without the profile's packs and
 reports the domain gates as `NOT_VERIFIED` rather than guessing. Full path: `python3 ./scripts/skill_ambassador_auditor.py --verify <ws> --src-dir <source
-dir> --max-tier 3`. It reads the records, re-checks the test evidence, and runs the clinical or design linter
+dir> --max-tier 3`. It reads the records, re-checks the test evidence, and runs the gates of the packs the profile names (a pack's `pack.json` lists its gates)
 only where the profile's packs call for it. Read its verdict literally: `APPROVED` (exit 0) is the only pass;
 `BLOCKED_BY_SKILL_VIOLATIONS` (exit 1) means fix and re-run; `INCOMPLETE_NOT_VERIFIED` (exit 3) means a gate
 applies but could not be checked (unknown domains, a linter that scanned 0 files, a deferred test), and you
@@ -223,9 +223,9 @@ Details in `references/token_economy.md`. In short:
 | `references/test_economy.md` | Phase 4, always on the Full path |
 | `references/verification_principles.md` | Writing or judging any test |
 | `references/intake.md` | First run in a project, or when a task contradicts the profile |
-| `packs/INDEX.md` | Phase 1, to load the packs the profile names (core, fintech, systems, data-etl, clinical) |
+| `packs/INDEX.md` | Phase 1, to load the packs the profile names (core, fintech, systems, data-etl, clinical, web-ui; each pack may add gates via `pack.json`) |
 | `references/token_economy.md` | Writing briefs, choosing models, before writing any helper script |
-| `references/e2e_and_call_chain_testing.md` | Android/Kotlin, Compose or clinical stacks (part of the clinical pack) |
+| `references/e2e_and_call_chain_testing.md` | Android/Kotlin, Compose or clinical stacks (an optional recipe, not part of the core) |
 | `references/ui_ux_mocking.md` | Any UI change |
 | `references/ponytail_ladder.md`, `references/coding_guidelines.md` | Phase 2 |
 | `references/deep_diagnostics.md` | Optional T4 profiling |

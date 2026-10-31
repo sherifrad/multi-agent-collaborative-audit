@@ -1,34 +1,56 @@
 {
-  "_comment": "Copy to <workspace>/.agents/TEST_MANIFEST.json. One entry per test. deps = globs of every file whose change could alter the result (the code under test, its callers, fixtures, the test itself). Use `impact_and_cache.py deps-suggest --root . --symbol <fn>` to find callers.",
+  "_comment": "Copy to <workspace>/.agents/TEST_MANIFEST.json. One entry per test. cmd is run by `impact_and_cache.py run` and must exit non-zero on failure (no `true`/`echo`). deps = globs of every file whose change could alter the result (code under test, callers, fixtures, the test itself). covers = the ORACLE-<id> lines this test proves; the referee blocks an oracle no test covers. Use `impact_and_cache.py deps-suggest --root . --symbol <fn>` to find callers.",
   "tests": [
     {
       "id": "UNIT-rule-boundaries",
       "tier": 1,
-      "cmd": "./gradlew :core:test --tests '*LimitRuleBoundaryTest'",
-      "deps": ["core/src/**/LimitRule*.kt", "core/src/test/**/LimitRuleBoundaryTest.kt"],
+      "cmd": "pytest tests/test_rules.py -q",
+      "deps": [
+        "src/rules/**/*.py",
+        "tests/test_rules.py"
+      ],
       "always": true,
-      "covers": ["ORACLE-1", "ORACLE-2"]
+      "covers": [
+        "ORACLE-1",
+        "ORACLE-2"
+      ]
     },
     {
-      "id": "INT-caller-entry-flow",
+      "id": "INT-caller-flow",
       "tier": 2,
-      "cmd": "./gradlew :app:testDebugUnitTest --tests '*EntryFlowFlowTest'",
-      "deps": ["core/src/**/LimitRule*.kt", "app/src/**/EntryFlow*.kt", "app/src/test/**/EntryFlowFlowTest.kt"],
-      "covers": ["ORACLE-3"]
+      "cmd": "pytest tests/test_entry_flow.py -q",
+      "deps": [
+        "src/rules/**/*.py",
+        "src/entry/**/*.py",
+        "tests/test_entry_flow.py"
+      ],
+      "covers": [
+        "ORACLE-3"
+      ]
     },
     {
       "id": "E2E-sequential-scenario",
       "tier": 3,
-      "cmd": "./gradlew :app:connectedDebugAndroidTest --tests '*SequentialScenario'",
-      "deps": ["core/src/**/*.kt", "app/src/**/*.kt", "app/src/androidTest/**/SequentialScenario.kt"],
-      "covers": ["ORACLE-1", "ORACLE-4"]
+      "cmd": "pytest tests/e2e/test_sequence.py -q",
+      "deps": [
+        "src/**/*.py",
+        "tests/e2e/test_sequence.py"
+      ],
+      "covers": [
+        "ORACLE-1",
+        "ORACLE-4"
+      ]
     },
     {
       "id": "DEEP-full-replay",
       "tier": 4,
-      "cmd": "./gradlew connectedCheck",
-      "deps": ["**/*.kt"],
-      "covers": ["release-gate"]
+      "cmd": "pytest -q",
+      "deps": [
+        "**/*.py"
+      ],
+      "covers": [
+        "release-gate"
+      ]
     }
   ]
 }

@@ -94,7 +94,7 @@ flowchart LR
 
 ```bash
 python3 scripts/impact_and_cache.py select --ws . --max-tier 2   # prints RUN / REUSE / DEFER
-python3 scripts/impact_and_cache.py record --ws . --id <test> --status pass
+python3 scripts/impact_and_cache.py run --ws . --id <test>
 ```
 
 Deferred tests are never reported as passed. Failed tests and unmatched dependencies always run.

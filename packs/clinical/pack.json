@@ -1,0 +1,7 @@
+{
+  "name": "clinical",
+  "domains": ["clinical"],
+  "gates": [
+    {"id": "S7", "name": "Clinical safety invariants linter", "script": "scripts/lint_samd_invariants.py", "applies_when": ["clinical"]}
+  ]
+}

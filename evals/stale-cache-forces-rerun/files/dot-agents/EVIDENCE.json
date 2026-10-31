@@ -9,7 +9,9 @@
       },
       "cmd": "node test/pricing.test.js",
       "ts": "2026-10-31T10:02:34Z",
-      "note": "baseline"
+      "note": "baseline",
+      "ran": true,
+      "exit": 0
     },
     "UNIT-currency": {
       "status": "pass",
@@ -20,7 +22,9 @@
       },
       "cmd": "node test/currency.test.js",
       "ts": "2026-10-31T10:02:34Z",
-      "note": "baseline"
+      "note": "baseline",
+      "ran": true,
+      "exit": 0
     },
     "INT-checkout": {
       "status": "pass",
@@ -32,7 +36,9 @@
       },
       "cmd": "node test/checkout.test.js",
       "ts": "2026-10-31T10:02:34Z",
-      "note": "baseline"
+      "note": "baseline",
+      "ran": true,
+      "exit": 0
     }
   }
 }

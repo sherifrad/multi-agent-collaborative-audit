@@ -33,7 +33,7 @@ Workflow per round:
 ```
 python3 scripts/impact_and_cache.py select --ws <ws> --max-tier 2     # show plan: RUN / REUSE / DEFER
 # run only the RUN lines, then for each result:
-python3 scripts/impact_and_cache.py record --ws <ws> --id <id> --status pass|fail --note "<evidence>"
+python3 scripts/impact_and_cache.py run --ws <ws> --id <id>   # executes cmd, records exit code and output hash
 python3 scripts/impact_and_cache.py status --ws <ws>                   # fresh / stale / never / failed
 ```
 

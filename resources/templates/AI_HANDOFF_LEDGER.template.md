@@ -29,7 +29,7 @@ ASSUMPTION: what="<decision taken without an answer>" default="<option chosen>" 
 
 ## 4. Verification
 
-Test results live in `.agents/EVIDENCE.json` (written by `impact_and_cache.py record`). Summary line for the report:
+Test results live in `.agents/EVIDENCE.json` (written by `impact_and_cache.py run`). Summary line for the report:
 `Ran N | Reused N (identical deps) | Deferred N (not run)`
 
 ## 5. Debt and deferred shortcuts

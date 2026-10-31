@@ -25,6 +25,7 @@ Decision rules (in order), per test:
   5. dep_hash differs             -> RUN     (lists which files changed)
   6. otherwise                    -> REUSE   (prior pass, hash identical)
 """
+import subprocess
 import argparse
 import fnmatch
 import glob
@@ -110,6 +111,8 @@ def load_tests(ws):
         for key in ("id", "tier", "cmd", "deps"):
             if key not in t:
                 fail("BadManifest", f"Test entry missing '{key}': {t}", "Add the field.")
+        if re.fullmatch(r"\s*(true|:|exit 0|echo\b.*|printf\b.*)\s*", str(t["cmd"])):
+            fail("BadManifest", f"Test {t['id']} has a no-op cmd '{t['cmd']}'", "A test command must run real checks.")
         if t["id"] in seen:
             fail("BadManifest", f"Duplicate test id {t['id']}", "Ids must be unique.")
         seen.add(t["id"])
@@ -124,6 +127,9 @@ def select(ws, max_tier):
         tid = t["id"]
         cur_hash, cur_files = dep_state(ws, t)
         ev = evidence.get(tid)
+        by_hand = bool(ev and not ev.get("ran"))
+        if by_hand:
+            ev = None  # a pass typed in by hand is not evidence; only `run` results count
         row = {"id": tid, "tier": t["tier"], "cmd": t["cmd"], "action": "RUN", "reason": ""}
         if max_tier is not None and t["tier"] > max_tier:
             row.update(action="DEFER", reason=f"tier {t['tier']} above this round's ceiling {max_tier}; NOT RUN, not a pass")
@@ -133,7 +139,7 @@ def select(ws, max_tier):
             row["always"] = True
             row["proven_now"] = bool(ev and ev.get("status") == "pass" and cur_files and ev.get("dep_hash") == cur_hash)
         elif not ev:
-            row["reason"] = "never run"
+            row["reason"] = "recorded by hand, not run; use `run --id`" if by_hand else "never run"
         elif ev.get("status") != "pass":
             row["reason"] = f"last result was {ev.get('status')}"
         elif not cur_files:
@@ -148,7 +154,7 @@ def select(ws, max_tier):
     return plan
 
 
-def cmd_record(ws, tid, status, note):
+def cmd_record(ws, tid, status, note, extra=None):
     tests = {t["id"]: t for t in load_tests(ws)}
     if tid not in tests:
         fail("UnknownTest", f"No test '{tid}' in manifest", "Use an id from TEST_MANIFEST.json")
@@ -159,8 +165,26 @@ def cmd_record(ws, tid, status, note):
     data.setdefault("tests", {})[tid] = {
         "status": status, "dep_hash": h, "files": files, "cmd": t["cmd"],
         "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "note": note or ""}
+    data["tests"][tid].update(extra or {})
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return h
+
+
+def cmd_run(ws, tid, timeout=900):
+    """Execute the manifest cmd ourselves and record what happened. Only these records count as evidence."""
+    tests = {t["id"]: t for t in load_tests(ws)}
+    if tid not in tests:
+        fail("UnknownTest", f"No test '{tid}' in manifest", "Use an id from TEST_MANIFEST.json")
+    t0 = time.time()
+    try:
+        r = subprocess.run(tests[tid]["cmd"], shell=True, cwd=str(ws), capture_output=True, text=True, timeout=timeout)
+        code, out = r.returncode, (r.stdout or "") + (r.stderr or "")
+    except subprocess.TimeoutExpired:
+        code, out = 124, "timeout"
+    cmd_record(ws, tid, "pass" if code == 0 else "fail", f"exit {code}", {
+        "ran": True, "exit": code, "seconds": round(time.time() - t0, 2),
+        "out_sha": hashlib.sha256(out.encode()).hexdigest()[:16], "out_tail": out[-300:]})
+    return code, out
 
 
 def cmd_status(ws):
@@ -223,7 +247,7 @@ def self_test():
         assert p["UNIT-rule"]["action"] == "RUN" and p["UNIT-rule"]["reason"] == "never run"
         assert p["DEEP"]["action"] == "DEFER", "tier above ceiling must be deferred, not passed"
         for tid in ("UNIT-rule", "UI-card", "BOUNDARY", "ORPHAN"):
-            cmd_record(ws, tid, "pass", "")
+            cmd_record(ws, tid, "pass", "", {"ran": True})
         p = by(select(ws, 2))
         assert p["UNIT-rule"]["action"] == "REUSE" and p["UI-card"]["action"] == "REUSE"
         assert p["BOUNDARY"]["action"] == "RUN", "always-run test must never be reused"
@@ -232,10 +256,23 @@ def self_test():
         p = by(select(ws, 2))
         assert p["UNIT-rule"]["action"] == "RUN" and "src/rule.py" in p["UNIT-rule"]["reason"]
         assert p["UI-card"]["action"] == "REUSE", "unrelated UI test must be reused"
-        cmd_record(ws, "UNIT-rule", "fail", "boom")
+        cmd_record(ws, "UNIT-rule", "fail", "boom", {"ran": True})
         assert by(select(ws, 2))["UNIT-rule"]["action"] == "RUN", "a failed result is never reused"
         assert cmd_status(ws)["failed"] == 1
         assert cmd_deps_suggest(ws, "rule") == ["src/rule.py"]
+        cmd_record(ws, "UI-card", "pass", "typed by hand")
+        assert by(select(ws, 2))["UI-card"]["action"] == "RUN", "a pass typed in by hand is not evidence"
+        m2 = {"tests": [{"id": "OK", "tier": 1, "cmd": "python3 -c 'import sys; sys.exit(0)'", "deps": ["src/ui.py"]},
+                        {"id": "BAD", "tier": 1, "cmd": "python3 -c 'import sys; sys.exit(3)'", "deps": ["src/ui.py"]}]}
+        (ws / ".agents" / MANIFEST).write_text(json.dumps(m2))
+        assert cmd_run(ws, "OK")[0] == 0 and cmd_run(ws, "BAD")[0] == 3
+        p = by(select(ws, 2))
+        assert p["OK"]["action"] == "REUSE" and p["BAD"]["action"] == "RUN", "run results are recorded from the real exit code"
+        (ws / ".agents" / MANIFEST).write_text(json.dumps({"tests": [{"id": "N", "tier": 1, "cmd": "true", "deps": ["src/ui.py"]}]}))
+        try:
+            load_tests(ws); raise AssertionError("no-op cmd accepted")
+        except SystemExit:
+            pass
     print(json.dumps({"status": "PASS", "checks": [
         "select: never-run, tier deferral, always-run, orphan fail-safe",
         "record + reuse on identical hashes", "change invalidates only dependent tests",
@@ -244,7 +281,7 @@ def self_test():
 
 def main():
     ap = argparse.ArgumentParser(description="MACA impact selector + evidence cache")
-    ap.add_argument("command", nargs="?", choices=["select", "record", "status", "invalidate", "deps-suggest"])
+    ap.add_argument("command", nargs="?", choices=["select", "run", "record", "status", "invalidate", "deps-suggest"])
     ap.add_argument("--ws")
     ap.add_argument("--root")
     ap.add_argument("--symbol")
@@ -274,6 +311,13 @@ def main():
             print(json.dumps(plan, indent=2) if a.json else "", end="" if a.json else "")
             if not a.json:
                 print_plan(plan)
+        elif a.command == "run":
+            if not a.id:
+                fail("Usage", "--id required", "run --ws W --id ID")
+            code, out = cmd_run(a.ws, a.id)
+            print(out[-1500:])
+            print(f"ran {a.id}: {'pass' if code == 0 else 'fail'} (exit {code})")
+            sys.exit(0 if code == 0 else 1)
         elif a.command == "record":
             if not (a.id and a.status):
                 fail("Usage", "--id and --status required", "record --ws W --id ID --status pass|fail")
