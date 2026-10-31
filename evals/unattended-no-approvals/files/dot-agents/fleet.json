@@ -1,0 +1,1 @@
+{"lanes":{"qa":{"primary":{"adapter":"cli","binary":"codex"}},"review":{"primary":{"adapter":"cli","binary":"gemini"}}}}

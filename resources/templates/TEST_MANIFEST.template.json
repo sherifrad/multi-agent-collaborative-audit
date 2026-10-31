@@ -4,23 +4,23 @@
     {
       "id": "UNIT-rule-boundaries",
       "tier": 1,
-      "cmd": "./gradlew :core:test --tests '*RuleBoundaryTest'",
-      "deps": ["core/src/**/Mgso4Rule*.kt", "core/src/test/**/RuleBoundaryTest.kt"],
+      "cmd": "./gradlew :core:test --tests '*LimitRuleBoundaryTest'",
+      "deps": ["core/src/**/LimitRule*.kt", "core/src/test/**/LimitRuleBoundaryTest.kt"],
       "always": true,
       "covers": ["ORACLE-1", "ORACLE-2"]
     },
     {
-      "id": "INT-caller-bedside-entry",
+      "id": "INT-caller-entry-flow",
       "tier": 2,
-      "cmd": "./gradlew :app:testDebugUnitTest --tests '*BedsideEntryFlowTest'",
-      "deps": ["core/src/**/Mgso4Rule*.kt", "app/src/**/BedsideEntry*.kt", "app/src/test/**/BedsideEntryFlowTest.kt"],
+      "cmd": "./gradlew :app:testDebugUnitTest --tests '*EntryFlowFlowTest'",
+      "deps": ["core/src/**/LimitRule*.kt", "app/src/**/EntryFlow*.kt", "app/src/test/**/EntryFlowFlowTest.kt"],
       "covers": ["ORACLE-3"]
     },
     {
-      "id": "E2E-sequential-resp-decline",
+      "id": "E2E-sequential-scenario",
       "tier": 3,
-      "cmd": "./gradlew :app:connectedDebugAndroidTest --tests '*RespDeclineScenario'",
-      "deps": ["core/src/**/*.kt", "app/src/**/*.kt", "app/src/androidTest/**/RespDeclineScenario.kt"],
+      "cmd": "./gradlew :app:connectedDebugAndroidTest --tests '*SequentialScenario'",
+      "deps": ["core/src/**/*.kt", "app/src/**/*.kt", "app/src/androidTest/**/SequentialScenario.kt"],
       "covers": ["ORACLE-1", "ORACLE-4"]
     },
     {

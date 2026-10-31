@@ -1,0 +1,3 @@
+{"tests":[
+ {"id":"UNIT-withdraw","tier":1,"cmd":"node test/account.test.js","deps":["src/account.js","test/account.test.js"],"covers":["ORACLE-1"]}
+]}

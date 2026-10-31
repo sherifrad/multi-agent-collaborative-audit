@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: skips-trivial-edit
+expected_outcome: |
+  The skill is not used for the ceremony: the rename is done directly with no intake, no reviewer fleet and no reports.
+context:
+  scaffold_script: place-files.sh

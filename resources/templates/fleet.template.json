@@ -18,8 +18,13 @@
       "primary": {
         "adapter": "cli",
         "binary": "claude",
-        "model": "claude-3-7-sonnet",
-        "args": ["-p", "{brief}", "--permission-mode", "{permission_mode}"]
+        "args": [
+          "-p",
+          "{brief}",
+          "--permission-mode",
+          "{permission_mode}"
+        ],
+        "permission_mode": "plan"
       },
       "fallback": {
         "adapter": "subagent",
@@ -32,8 +37,10 @@
       "primary": {
         "adapter": "cli",
         "binary": "opencode",
-        "model": "deepseek-ai/deepseek-r1",
-        "args": ["run", "-m", "{model}", "{brief}"]
+        "args": [
+          "run",
+          "{brief}"
+        ]
       },
       "fallback": {
         "adapter": "subagent",
@@ -46,7 +53,12 @@
       "primary": {
         "adapter": "cli",
         "binary": "codex",
-        "args": ["exec", "--brief", "{brief}"]
+        "args": [
+          "exec",
+          "--sandbox",
+          "read-only",
+          "{brief}"
+        ]
       },
       "fallback": {
         "adapter": "subagent",
@@ -59,7 +71,10 @@
       "primary": {
         "adapter": "cli",
         "binary": "gemini",
-        "args": ["-p", "{brief}"]
+        "args": [
+          "-p",
+          "{brief}"
+        ]
       },
       "fallback": {
         "adapter": "subagent",
@@ -88,12 +103,16 @@
     "custom_agent_script": {
       "adapter": "script",
       "executable": "./scripts/my_agent_runner.sh",
-      "args": ["--task", "{brief}"]
+      "args": [
+        "--task",
+        "{brief}"
+      ]
     },
     "zero_api_subagent_only": {
       "adapter": "subagent",
       "role_name": "Autonomous In-IDE Agent",
       "notes": "100% free, zero external keys, works directly in Antigravity"
     }
-  }
+  },
+  "_note": "Lanes here are read-only by default. A lane in this file is configuration, not approval: vendors must be listed under 'Approved vendors' in .agents/PROJECT_PROFILE.md, and editing lanes under 'Write-lane permissions'. Pin a model per lane with a \"model\" key and {model} in args only when you need one."
 }

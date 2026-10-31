@@ -143,7 +143,7 @@ def execute_cli_adapter(config: Dict[str, Any], brief_text: str, workspace_dir: 
     for arg in args_template:
         arg = arg.replace("{brief}", brief_text)
         arg = arg.replace("{model}", model)
-        arg = arg.replace("{permission_mode}", "acceptEdits")
+        arg = arg.replace("{permission_mode}", config.get("permission_mode", "plan"))  # "plan" = read-only; a lane that may edit must say so in fleet.json AND be named in the profile's Write-lane permissions
         rendered_args.append(arg)
 
     env = {**os.environ, "PATH": ENHANCED_PATH}

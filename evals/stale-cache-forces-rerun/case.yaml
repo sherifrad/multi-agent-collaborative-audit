@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: stale-cache-forces-rerun
+expected_outcome: |
+  The evidence cache plan is run, tests whose deps changed (UNIT-pricing, INT-checkout) are re-run, UNIT-currency is reused with its reason, the T3 test is reported as deferred / not run, and the plan line is accurate. The whole suite is not additionally run to be safe.
+context:
+  scaffold_script: place-files.sh

@@ -129,6 +129,9 @@ def select(ws, max_tier):
             row.update(action="DEFER", reason=f"tier {t['tier']} above this round's ceiling {max_tier}; NOT RUN, not a pass")
         elif t.get("always"):
             row["reason"] = "always-run (safety/boundary test)"
+            # still RUN every round; `proven_now` tells a verifier whether a pass was already recorded against the current deps
+            row["always"] = True
+            row["proven_now"] = bool(ev and ev.get("status") == "pass" and cur_files and ev.get("dep_hash") == cur_hash)
         elif not ev:
             row["reason"] = "never run"
         elif ev.get("status") != "pass":

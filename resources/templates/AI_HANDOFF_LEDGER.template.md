@@ -1,70 +1,38 @@
-# AI Handoff & Provenance Ledger
+# Handoff ledger
 
-This ledger tracks asynchronous task handoffs, cross-lane critiques, call-chain audits, sequential E2E scenario verification, unresolved blockers, and technical debt.
+Machine-readable records are single lines starting with the tag. The referee (`skill_ambassador_auditor.py`)
+reads these, not the prose around them. Keep one record per line; use `key=value`, quote values with spaces.
 
----
+## 1. Handoffs
 
-## 1. Handoff Log
+| ID | Time (ISO) | From | To | Artifacts | Status | Summary |
+| :-- | :-- | :-- | :-- | :-- | :-- | :-- |
+| H-001 | YYYY-MM-DDTHH:MM | orchestrator | test-designer | .agents/SPEC_AND_AUDIT.md | sent | spec and oracles |
 
-| Entry ID | Timestamp (ISO) | From Lane | To Lane | Scope / Artifacts | Status | Summary |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `H-001` | YYYY-MM-DDTHH:MM:SS | UI/UX Lane (Claude) | User / Orchestrator | `.agents/mocks/dashboard.html` | Approved | Visual design mock signed off by user |
-| `H-002` | YYYY-MM-DDTHH:MM:SS | Core Logic Lane | QA & E2E Audit Lane | `src/clinical/evaluator.kt` | Verified | Sequential 3-step E2E & Call-Chain Oracle passed |
+## 2. Reviews (max 2 rounds)
 
----
+Reviewer must differ from author. `independence` is multi-vendor (2+ model families), same-family,
+single-model, or same-model (a fresh process of the same model). `evidence` is a file under the repo or `.agents/`,
+or the command that was run.
 
-## 2. Peer Review, Adversarial Diff Audit & Call-Chain Bug Hunt (Max 2 Rounds)
+REVIEW: id=R-1 author=<lane/model> reviewer=<lane/model> independence=<level> round=1 evidence=<path or command> verdict=<pass|blockers|deferred>
 
-### Task ID: `[TASK-ID from current_task.md / PLAN_TASKS.md]`
-* **Author Lane**: `[e.g., Core Logic Lane / Data Lane]`
-* **Adversarial Reviewer Lane & Proof**: `[e.g., QA Lane — CLI/Subagent/Verification Command Output]`
-* **Zero-Presumption Check**: Verified requirement independently from scratch without inheriting author assumptions.
-* **Cross-Function Call-Chain Audit**:
-  * *Functions Modified*: `[List functions]`
-  * *All Callers Inspected*: `[List every caller across UI, ViewModel, Handoff, Export and confirm parameter/unit consistency]`
-* **Round 1 Bug Hunt & Diff Audit**:
-  * *Audit Scope*: `[List files and git diff ranges inspected]`
-  * *Discovered Defects & Fragilities*: `[Regressions, call-chain mismatches, null states, L10n leaks, narrow-screen clipping, a11y]`
-  * *Classification*: `[Hard Blocker | Deferred Shortcut | PASS]`
-  * *Author Action Taken*: `[Fix details applied to git diff]`
-* **Round 2 Verification**:
-  * *Status*: `[PASSED | DEADLOCKED]`
-* **Arbiter Ruling** *(if deadlocked after Round 2)*:
-  * *Antigravity Verdict*: `[Binding decision & code override]`
+Findings (file:line, class, why), classified Hard Blocker / Deferred Shortcut / Pass: `[...]`
 
----
+## 3. Approvals and assumptions
 
-## 3. Phase 4 Dedicated Sequential E2E & 3-Layer Outcome Verification Report
+A person must approve these; the orchestrator cannot approve for them. If nobody can answer (unattended), do not
+write an APPROVAL: write an ASSUMPTION, take the cautious option, and stop short of the gated action.
 
-* **Scenario Mode Selected**: `[Mode A: Predefined Suite | Mode B: AI-Proposed Imaginary Scenarios | Mode C: User Custom Sequence]`
-* **Fast-Forward Baseline Intake Used**: `[YES (Header only) / NO]`
-* **Anti-Bulk-Mock Compliance**: `VERIFIED — All time-series observations entered sequentially step by step (T0 -> Save -> T+1h -> Save -> Reload)`
-* **Zero-Internal-Mock Call-Chain Path**: `[e.g., UI Action -> ViewModel -> Validator -> Evaluator -> Room/Dexie DB -> Rehydration -> Matrix/Handoff]`
-* **3-Layer Intended Outcome Oracle Results**:
-  1. *Logical / Domain Oracle*: `[Exact ruleId, signal state, and progression math verified — PASS/FAIL]`
-  2. *Persistence / DB Oracle*: `[Exact rows, scaled integers, and audit lineage verified — PASS/FAIL]`
-  3. *Visual / UI & Narrow-Screen Oracle*: `[Exact badges, labels, Handoff summary, and 320dp/360dp layout verified — PASS/FAIL]`
-  4. *Negative-Control & Boundary Proof*: `[Just-below boundary and invalid input blocked cleanly — PASS/FAIL]`
-* **Task Queue Check-Off (`current_task.md`)**: `[Checked off [x] with command & date evidence]`
+APPROVAL: what=<ui-mock | vendor:<name> | tier-ceiling:<n> | write-lane:<name>> by=<person> date=<YYYY-MM-DD>
+ASSUMPTION: what="<decision taken without an answer>" default="<option chosen>" needs-confirmation=yes
 
----
+## 4. Verification
 
-## 4. Phase 4.5 Deep Diagnostics & Production Verification Report (On-Demand)
+Test results live in `.agents/EVIDENCE.json` (written by `impact_and_cache.py record`). Summary line for the report:
+`Ran N | Reused N (identical deps) | Deferred N (not run)`
 
-* **User Consent Granted**: `[YES / NO / SKIPPED]`
-* **Available Testing Skills Discovered**: `[e2e, playwright, android-profiler, android-cli, firebase-crashlytics, testing-setup]`
-* **Pillar A (Runtime & Logcat)**: `[Silent exceptions, StrictMode, Coroutine lifecycles - PASS/FAIL]`
-* **Pillar B (Memory & Jank)**: `[Choreographer frame drops, Heap allocations, Touch targets - PASS/FAIL]`
-* **Pillar C (Crashlytics & Telemetry)**: `[Mapping file upload, Non-fatal logging, Zero-PII HIPAA - PASS/FAIL]`
-* **Pillar D (Full Cached E2E Replay)**: `[All longitudinal E2E scenarios replayed cleanly - PASS/FAIL]`
-* **Production Release Clearance**: `[CLEARED FOR RELEASE / BLOCKED]`
+## 5. Debt and deferred shortcuts
 
----
-
-## 5. Ponytail Debt & Deferred Shortcuts Ledger
-
-Log all deferred optimizations tagged with `// ponytail: <upgrade path>` here to ensure long-term visibility without blocking immediate delivery:
-
-| Debt ID | File & Line | Ponytail Rung | Description & Justification | Target Milestone |
-| :--- | :--- | :--- | :--- | :--- |
-| `D-001` | `src/auth/token.ts#L42` | Rung 3 (stdlib) | Basic in-memory token cache used. Deferring Redis client until scale demands it. | v2.1 |
+| Item | Why accepted | Revisit by |
+| :-- | :-- | :-- |

@@ -59,6 +59,9 @@ REQUIRED_INTERNAL_FILES = [
     "packs/clinical/PACK.md",
     "scripts/impact_and_cache.py",
     "scripts/harness.py",
+    "scripts/lane_fallback.py",
+    "scripts/fleet_review.sh",
+    "packs/clinical/SPEC_AND_LEDGER_SECTIONS.md",
     "resources/templates/PROJECT_PROFILE.template.md",
     "resources/templates/TEST_MANIFEST.template.json",
     "references/ui_ux_mocking.md",
@@ -69,11 +72,13 @@ REQUIRED_INTERNAL_FILES = [
     "resources/templates/AI_HANDOFF_LEDGER.template.md",
     "resources/templates/SPEC_AND_AUDIT.template.md",
     "resources/templates/MACA_TOURNAMENT_LEADERBOARD.template.md",
-    "resources/templates/SKILL_COMPLIANCE_LOG.template.md",
     "resources/templates/fleet.template.json",
     "vendor/delegate-skills/skills/shared_relay.mjs",
     "vendor/delegate-skills/skills/codex-delegate/SKILL.md",
     "vendor/delegate-skills/skills/codex-delegate/scripts/relay.mjs",
+    "vendor/delegate-skills/skills/gemini-delegate/SKILL.md",
+    "vendor/delegate-skills/skills/gemini-delegate/scripts/relay.mjs",
+    "scripts/fleet_review.sh",
     "vendor/delegate-skills/skills/opencode-delegate/SKILL.md",
     "vendor/delegate-skills/skills/opencode-delegate/scripts/relay.mjs",
     "vendor/delegate-skills/skills/claude-delegate/SKILL.md",
@@ -175,6 +180,11 @@ def compute_skill_fingerprint() -> str:
         SCRIPT_DIR / "lint_samd_invariants.py",
         SCRIPT_DIR / "lint_design_and_ux.py",
         SCRIPT_DIR / "fleet_dispatch.py",
+        SCRIPT_DIR / "fleet_review.sh",
+        SCRIPT_DIR / "lane_fallback.py",
+        SCRIPT_DIR / "impact_and_cache.py",
+        SCRIPT_DIR / "harness.py",
+        SKILL_ROOT / "resources/templates/PROJECT_PROFILE.template.md",
         SKILL_ROOT / "resources/templates/fleet.template.json",
         SKILL_ROOT / "vendor/delegate-skills/skills/shared_relay.mjs"
     ]
@@ -210,6 +220,7 @@ def run_internal_script_selftests() -> List[Dict[str, Any]]:
         ("fleet_dispatch.py", [sys.executable, str(SCRIPT_DIR / "fleet_dispatch.py"), "--self-test"]),
         ("impact_and_cache.py", [sys.executable, str(SCRIPT_DIR / "impact_and_cache.py"), "--self-test"]),
         ("harness.py", [sys.executable, str(SCRIPT_DIR / "harness.py"), "--self-test"]),
+        ("lane_fallback.py", [sys.executable, str(SCRIPT_DIR / "lane_fallback.py"), "--self-test"]),
     ]
     for name, cmd in py_scripts:
         tasks.append({
@@ -219,7 +230,7 @@ def run_internal_script_selftests() -> List[Dict[str, Any]]:
         })
 
     node_bin = shutil.which("node", path=ENHANCED_PATH)
-    for relay in ["codex-delegate", "opencode-delegate", "claude-delegate", "agy-delegate"]:
+    for relay in ["codex-delegate", "opencode-delegate", "claude-delegate", "agy-delegate", "gemini-delegate"]:
         relay_path = SKILL_ROOT / "vendor" / "delegate-skills" / "skills" / relay / "scripts" / "relay.mjs"
         tasks.append({
             "type": "node",

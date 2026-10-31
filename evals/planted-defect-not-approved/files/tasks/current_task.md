@@ -1,0 +1,1 @@
+- [ ] withdraw: reduce an account balance

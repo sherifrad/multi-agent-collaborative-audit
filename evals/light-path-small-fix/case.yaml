@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: light-path-small-fix
+expected_outcome: |
+  Light path chosen and stated; the reviewer is a fresh process that did not write the fix and receives spec + diff only; tests actually run; paper trail limited to REPORT.md plus at most review.md; no .agents ceremony.
+context:
+  scaffold_script: place-files.sh

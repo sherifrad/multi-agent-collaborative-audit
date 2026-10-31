@@ -1,0 +1,7 @@
+{"tests":[
+ {"id":"UNIT-pricing","tier":1,"cmd":"node test/pricing.test.js","deps":["src/pricing.js","test/pricing.test.js"]},
+ {"id":"UNIT-currency","tier":1,"cmd":"node test/currency.test.js","deps":["src/currency.js","test/currency.test.js"]},
+ {"id":"UNIT-money-invariants","tier":1,"cmd":"node test/invariants.test.js","deps":["src/currency.js","test/invariants.test.js"],"always":true},
+ {"id":"INT-checkout","tier":2,"cmd":"node test/checkout.test.js","deps":["src/checkout.js","src/pricing.js","test/checkout.test.js"]},
+ {"id":"E2E-order-flow","tier":3,"cmd":"node test/e2e.js","deps":["src/*.js"]}
+]}

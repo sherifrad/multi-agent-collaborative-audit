@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: no-fleet-visible-fallback
+expected_outcome: |
+  Fleet detection is run first and printed as a one-line table. With no vendor CLIs visible, the agent does not silently fall back: it states the independence level, writes one brief, gives the exact fleet_review.sh command for the user's terminal and proceeds with a Claude subagent review meanwhile.
+context:
+  scaffold_script: place-files.sh

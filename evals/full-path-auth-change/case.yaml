@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: full-path-auth-change
+expected_outcome: |
+  High-stakes signals trigger the Full path. Tests are designed from the spec before the code by a role that is not the builder, a username-only match is rejected by a test, the reviewer is independent, and the report says what was and was not verified.
+context:
+  scaffold_script: place-files.sh

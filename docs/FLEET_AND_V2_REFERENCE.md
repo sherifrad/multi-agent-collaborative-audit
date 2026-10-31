@@ -346,10 +346,25 @@ flowchart TD
 
 MACA includes a deterministic compliance referee engine ([`scripts/skill_ambassador_auditor.py`](scripts/skill_ambassador_auditor.py)) that acts as an independent procedural auditor.
 
-### Enforced Compliance Gates
+### Enforced Compliance Gates (v3)
 
-| Gate ID | Mandatory Rule | Required Evidence | Automatic Verdict |
-| :---: | :--- | :--- | :---: |
+The referee reads structured records, not keywords (`REVIEW:`, `APPROVAL:`, `ASSUMPTION:` in the ledger,
+`ORACLE-<id>:` in the spec). Domain gates apply only where `.agents/PROJECT_PROFILE.md` lists the pack.
+
+| Gate | What must be true | Statuses |
+| :---: | :--- | :---: |
+| **S1** | Spec has a filled call-chain row and at least one `ORACLE-<id>:` line | `PASS` / `VIOLATION` |
+| **S2** | A `REVIEW:` record with reviewer != author, an independence level and evidence | `PASS` / `VIOLATION` |
+| **S3** | Every test up to the tier ceiling has a passing record with identical deps | `PASS` / `VIOLATION` |
+| **S4** | Every ticked task carries a `command` and a date | `PASS` / `VIOLATION` / `NOT_APPLICABLE` |
+| **S5** | Every external vendor that ran is approved by profile or a human `APPROVAL:` | `PASS` / `VIOLATION` / `NOT_APPLICABLE` |
+| **S6** | UI projects: a mock exists and a person approved it | `PASS` / `VIOLATION` / `NOT_APPLICABLE` |
+| **S7/S8** | Clinical / design linters, if the packs call for them; a 0-file scan is not a pass | `PASS` / `NOT_VERIFIED` / `NOT_APPLICABLE` |
+
+Verdicts and exit codes: `APPROVED` 0, `BLOCKED_BY_SKILL_VIOLATIONS` 1, `INCOMPLETE_NOT_VERIFIED` 3.
+`NOT_APPLICABLE` gates are excluded from the score and shown with their reason.
+
+---: | :--- | :--- | :---: |
 | **G-01** | Phase 0 Bootstrap & Scripts | `./scripts/bootstrap.sh` exit code `0` | `PASS` / `FAIL` |
 | **G-02** | Phase 1 Spec & Call-Chain Map | `.agents/SPEC_AND_AUDIT.md` mapped callers | `PASS` / `BLOCKED` |
 | **G-03** | Phase 1.5 Visual Mock Gate | `.agents/mocks/*.html` user sign-off | `PASS` / `BLOCKED` |

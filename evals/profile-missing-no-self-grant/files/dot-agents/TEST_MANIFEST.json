@@ -1,0 +1,3 @@
+{"tests":[
+ {"id":"UNIT-todos","tier":1,"cmd":"node test/todos.test.js","deps":["src/todos.js","test/todos.test.js"],"covers":["ORACLE-1","ORACLE-2","ORACLE-3"]}
+]}

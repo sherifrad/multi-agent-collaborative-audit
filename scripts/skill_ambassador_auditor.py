@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
 """
-================================================================================
-MACA v2 Automated Pre-Commit Subagent Referee & Skill Ambassador Engine
-(scripts/skill_ambassador_auditor.py)
---------------------------------------------------------------------------------
-Implements Upgrade 5 from the MACA Engineering Post-Mortem:
-- Acts as the deterministic CLI referee (`--verify <workspace_dir>`).
-- Automatically runs `lint_samd_invariants.py` (Zero Hard-Delete, JVM 255-arg
-  budget, and RBAC string-heuristic checks).
-- Computes cryptographic SHA-256 verification hashes of all modified files in
-  the working tree to prove zero unreviewed changes bypassed the Tabula Rasa
-  audit.
-- Auto-generates and appends a deterministic Markdown Compliance Proof section
-  into `.agents/SKILL_COMPLIANCE_LOG.md`.
-================================================================================
+MACA referee (scripts/skill_ambassador_auditor.py), stdlib only.
+
+Checks that a workspace's .agents/ records contain real evidence for the gates SKILL.md requires, instead of
+matching keywords. The old v2 referee passed on words like "incremental" or "persistence" appearing anywhere;
+this one reads structured records:
+
+  REVIEW:     id=R-1 author=<who> reviewer=<who> independence=<multi-vendor|same-family|single-model|same-model>
+              round=1 evidence=<file path or command> verdict=<pass|blockers|deferred>
+  APPROVAL:   what=<ui-mock|vendor:codex|tier-ceiling:3|...> by=<a person> date=YYYY-MM-DD
+  ASSUMPTION: what=<decision taken in place of an answer> default=<what was chosen>
+
+Gate statuses
+  PASS          evidence found and checked
+  VIOLATION     evidence missing or contradicted            -> verdict BLOCKED_BY_SKILL_VIOLATIONS, exit 1
+  NOT_VERIFIED  the gate applies but could not be checked   -> verdict INCOMPLETE_NOT_VERIFIED,      exit 3
+                (a linter that scanned 0 files, an unknown domain, a deferred test above the ceiling)
+  NOT_APPLICABLE  the profile/flags say the gate does not apply; excluded from the score, reason shown
+
+Exit 0 only when every applicable gate is PASS. Which domain gates apply comes from `.agents/PROJECT_PROFILE.md`
+("Domains / packs") or --domains; with neither, domain gates are NOT_VERIFIED rather than silently skipped.
 """
 
 import argparse
@@ -26,371 +32,474 @@ import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Set
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SAMD_LINTER_PATH = SCRIPT_DIR / "lint_samd_invariants.py"
 DESIGN_LINTER_PATH = SCRIPT_DIR / "lint_design_and_ux.py"
+CACHE_PATH = SCRIPT_DIR / "impact_and_cache.py"
+
+INDEPENDENCE = {"multi-vendor", "same-family", "single-model", "same-model"}
+NON_HUMAN = {"ai", "agent", "assistant", "orchestrator", "claude", "unattended", "assumed", "auto", "self", "none", ""}
+UI_WORDS = {"ui", "web", "web-app", "mobile", "android", "ios", "frontend", "compose"}
+VENDORS = ("opencode", "codex", "gemini", "agy")  # claude is the local family; it needs no vendor approval
 
 
 def emit_fail_closed_error(error_code: str, message: str, remediation: str) -> None:
-    payload = {
+    print(json.dumps({
         "status": "MACA_SCRIPT_ERROR — STOP_AND_FIX",
         "error_code": error_code,
         "message": message,
         "mandatory_agent_action": "DO NOT SKIP OR BYPASS THIS STEP. Fix the error described below and re-run, or halt and report UNKNOWN / HARNESS ERROR.",
-        "remediation": remediation
-    }
-    print(json.dumps(payload, indent=2), file=sys.stderr)
+        "remediation": remediation,
+    }, indent=2), file=sys.stderr)
     sys.exit(2)
 
 
-def compute_modified_files_hashes(workspace_dir: Path) -> List[Dict[str, str]]:
-    """Computes SHA-256 hashes of all modified/untracked files in git status (Upgrade 5)."""
-    hashes: List[Dict[str, str]] = []
+# ---------------------------------------------------------------- record parsing
+
+def read(path: Path) -> str:
+    return path.read_text(encoding="utf-8", errors="ignore") if path.exists() else ""
+
+
+def records(text: str, tag: str) -> List[Dict[str, str]]:
+    """Parse `TAG: k=v k=v ...` lines. Values may be quoted with double quotes to hold spaces."""
+    out = []
+    for line in text.splitlines():
+        m = re.match(r"^\s*(?:[-*]\s*)?`?%s:\s*(.+?)`?\s*$" % tag, line)
+        if not m:
+            continue
+        rec = {k.lower(): (v1 or v2).strip() for k, v1, v2 in re.findall(r'(\w+)=(?:"([^"]*)"|(\S+))', m.group(1))}
+        out.append(rec)
+    return out
+
+
+def profile_field(profile: str, name: str) -> str:
+    m = re.search(r"\*\*%s\*\*(?:\s*\([^)\n]*\))?[^\n:]*:[ \t]*(.*)" % re.escape(name), profile)
+    val = m.group(1).strip() if m else ""
+    return "" if is_placeholder(re.sub(r"\(inferred[^)]*\)", "", val)) else val
+
+
+def is_placeholder(text: str) -> bool:
+    t = text.strip().strip("`*_-| ")
+    return (not t) or bool(re.fullmatch(r"[\[<].*[\]>]", t))
+
+
+# ---------------------------------------------------------------- gates
+
+def gate(findings: List[Dict[str, str]], gid: str, name: str, status: str, detail: str) -> None:
+    findings.append({"gate": f"{gid} ({name})", "status": status, "detail": detail})
+
+
+def check_spec(ws: Path, findings) -> None:
+    spec = read(ws / ".agents" / "SPEC_AND_AUDIT.md") or read(ws / "SPEC_AND_AUDIT.md")
+    if not spec:
+        return gate(findings, "S1", "Spec, call-chain map, oracles", "VIOLATION", "Missing .agents/SPEC_AND_AUDIT.md")
+    sections = re.split(r"^#{1,4}\s+", spec, flags=re.M)
+    chain_body = next((s for s in sections if re.match(r"[^\n]*call[- ]chain", s, re.I)), "")
+    chain_rows = [l for l in chain_body.splitlines()[1:] if l.strip().startswith(("|", "-", "*")) and not re.fullmatch(r"[\s|:\-]+", l)]
+    real_rows = [l for l in chain_rows if not re.search(r"\[[^\]]*\]|target function|upstream callers", l, re.I)]
+    oracles = [m.group(1) for m in re.finditer(r"^\s*(?:[-*]\s*)?`?ORACLE-\w+`?:\s*(.+)$", spec, re.M) if not is_placeholder(m.group(1))]
+    problems = []
+    if not real_rows:
+        problems.append("call-chain section has no filled-in row (only template placeholders or missing)")
+    if not oracles:
+        problems.append("no `ORACLE-<id>: <observable result>` lines with real content")
+    if problems:
+        return gate(findings, "S1", "Spec, call-chain map, oracles", "VIOLATION", "; ".join(problems))
+    gate(findings, "S1", "Spec, call-chain map, oracles", "PASS", f"{len(real_rows)} call-chain row(s), {len(oracles)} oracle(s)")
+
+
+def check_reviews(ws: Path, ledger: str, findings) -> None:
+    reviews = records(ledger, "REVIEW")
+    if not reviews:
+        return gate(findings, "S2", "Independent review", "VIOLATION",
+                    "No `REVIEW:` record in the ledger. Prose that mentions a review is not accepted as evidence.")
+    problems = []
+    for r in reviews:
+        rid = r.get("id", "?")
+        a, v = r.get("author", "").lower(), r.get("reviewer", "").lower()
+        if not a or not v or a == v:
+            problems.append(f"{rid}: reviewer must differ from author (author={a or '-'}, reviewer={v or '-'})")
+        if r.get("independence", "") not in INDEPENDENCE:
+            problems.append(f"{rid}: independence must be one of {sorted(INDEPENDENCE)}")
+        ev = r.get("evidence", "")
+        if not ev:
+            problems.append(f"{rid}: no evidence")
+        elif re.fullmatch(r"[\w./-]+\.\w+", ev) and not (ws / ev).exists() and not (ws / ".agents" / ev).exists():
+            problems.append(f"{rid}: evidence file '{ev}' does not exist")
+    last = reviews[-1]
+    if last.get("verdict", "") not in {"pass", "deferred"}:
+        problems.append(f"latest review {last.get('id','?')} verdict is '{last.get('verdict','?')}', not pass/deferred")
+    if problems:
+        return gate(findings, "S2", "Independent review", "VIOLATION", "; ".join(problems))
+    levels = sorted({r["independence"] for r in reviews})
+    gate(findings, "S2", "Independent review", "PASS", f"{len(reviews)} review record(s), independence: {', '.join(levels)}")
+
+
+def oracles_without_test(ws: Path) -> List[str]:
+    spec = read(ws / ".agents" / "SPEC_AND_AUDIT.md")
+    ids = [m.group(1).upper() for m in re.finditer(r"^\s*(?:[-*]\s*)?`?(ORACLE-\w+)`?:\s*(.+)$", spec, re.M) if not is_placeholder(m.group(2))]
     try:
-        out = subprocess.check_output(
-            ["git", "-C", str(workspace_dir), "status", "--porcelain"],
-            stderr=subprocess.DEVNULL,
-            text=True
-        )
+        tests = json.loads(read(ws / ".agents" / "TEST_MANIFEST.json")).get("tests", [])
+    except ValueError:
+        return []
+    covered = {str(c).upper() for t in tests for c in (t.get("covers") or [])}
+    return [i for i in dict.fromkeys(ids) if i not in covered]
+
+
+def check_tests(ws: Path, max_tier: int, findings, not_verified: List[str]) -> None:
+    if not (ws / ".agents" / "TEST_MANIFEST.json").exists():
+        return gate(findings, "S3", "Tests and evidence cache", "VIOLATION", "Missing .agents/TEST_MANIFEST.json (no tests registered).")
+    proc = subprocess.run([sys.executable, str(CACHE_PATH), "select", "--ws", str(ws), "--max-tier", str(max_tier), "--json"],
+                          capture_output=True, text=True)
+    if proc.returncode != 0:
+        return gate(findings, "S3", "Tests and evidence cache", "VIOLATION", f"impact_and_cache.py failed: {(proc.stderr or proc.stdout).strip()[:300]}")
+    plan = json.loads(proc.stdout)
+    # `always` tests are scheduled every round by design; at close they count as proven if a pass is recorded against the current deps
+    pending = [t for t in plan if t["action"] == "RUN" and not (t.get("always") and t.get("proven_now"))]
+    deferred = [t for t in plan if t["action"] == "DEFER"]
+    for t in deferred:
+        not_verified.append(f"{t['id']} (tier {t['tier']} above ceiling {max_tier}): NOT RUN")
+    if not plan:
+        return gate(findings, "S3", "Tests and evidence cache", "VIOLATION", "Manifest has no tests.")
+    if pending:
+        ids = ", ".join(f"{t['id']} ({t['reason']})" for t in pending)
+        return gate(findings, "S3", "Tests and evidence cache", "VIOLATION", f"Not yet proven fresh: {ids}")
+    uncovered = oracles_without_test(ws)
+    if uncovered:
+        return gate(findings, "S3", "Tests and evidence cache", "VIOLATION",
+                    f"No registered test declares `covers` for: {', '.join(uncovered)}. A passing suite proves nothing about an oracle no test targets.")
+    reused = sum(1 for t in plan if t["action"] == "REUSE" or (t.get("always") and t.get("proven_now")))
+    gate(findings, "S3", "Tests and evidence cache", "PASS",
+         f"{reused} test(s) have a passing record with identical deps; {len(deferred)} deferred above tier {max_tier} and reported as not run")
+
+
+def check_task_queue(ws: Path, findings) -> None:
+    cands = [ws / "tasks" / "current_task.md", ws / "current_task.md", ws / ".agents" / "PLAN_TASKS.md"]
+    f = next((p for p in cands if p.exists()), None)
+    if not f:
+        return gate(findings, "S4", "Task queue ticks carry proof", "NOT_APPLICABLE", "No task queue file in this workspace")
+    ticked = [l for l in read(f).splitlines() if re.match(r"^\s*-\s*\[x\]", l, re.I)]
+    bad = [l.strip()[:80] for l in ticked if not (re.search(r"`[^`]+`", l) and re.search(r"\d{4}-\d{2}-\d{2}", l))]
+    if bad:
+        return gate(findings, "S4", "Task queue ticks carry proof", "VIOLATION", f"Ticked without a `command` and a YYYY-MM-DD date: {bad}")
+    gate(findings, "S4", "Task queue ticks carry proof", "PASS", f"{len(ticked)} ticked item(s) in {f.name}, each with command and date")
+
+
+def check_vendors(ws: Path, profile: str, ledger: str, findings) -> None:
+    runs = ws / ".agents" / "fleet-runs"
+    used: Set[str] = set()
+    if runs.exists():
+        for p in runs.rglob("*"):
+            for v in VENDORS:
+                if p.name.lower().startswith(v):
+                    used.add(v)
+    if not used:
+        return gate(findings, "S5", "Vendor dispatch was approved", "NOT_APPLICABLE", "No external vendor runs recorded under .agents/fleet-runs")
+    approved = {x.strip().lower() for x in re.split(r"[,\s]+", profile_field(profile, "Approved vendors")) if x.strip()}
+    approved |= {r.get("what", "").split(":", 1)[1].lower() for r in records(ledger, "APPROVAL")
+                 if r.get("what", "").lower().startswith("vendor:") and r.get("by", "").lower() not in NON_HUMAN}
+    missing = sorted(used - approved)
+    if missing:
+        return gate(findings, "S5", "Vendor dispatch was approved", "VIOLATION",
+                    f"Runs exist for {missing} but the profile 'Approved vendors' / a human APPROVAL record does not list them. A lane in fleet.json is not approval.")
+    gate(findings, "S5", "Vendor dispatch was approved", "PASS", f"Vendors used {sorted(used)} are all approved")
+
+
+def check_ui_mock(ws: Path, ledger: str, findings) -> None:
+    mocks = [p for p in (ws / ".agents" / "mocks").glob("*.*")] if (ws / ".agents" / "mocks").exists() else []
+    appr = [r for r in records(ledger, "APPROVAL") if r.get("what", "").lower() == "ui-mock" and r.get("by", "").lower() not in NON_HUMAN and r.get("date")]
+    if not mocks:
+        return gate(findings, "S6", "UI mock approved by a person", "VIOLATION", "No mock under .agents/mocks/")
+    if not appr:
+        return gate(findings, "S6", "UI mock approved by a person", "VIOLATION",
+                    "A mock exists but there is no `APPROVAL: what=ui-mock by=<person> date=<date>` record. When nobody can approve, stop at the mock and report; do not build the UI logic.")
+    gate(findings, "S6", "UI mock approved by a person", "PASS", f"{len(mocks)} mock(s); approved by {appr[0]['by']} on {appr[0]['date']}")
+
+
+def run_linter(path: Path, scan_dir: Path):
+    return subprocess.run([sys.executable, str(path), "--scan-dir", str(scan_dir)], capture_output=True, text=True)
+
+
+def check_linters(scan_dir: Path, domains: Optional[Set[str]], findings, not_verified: List[str]) -> None:
+    names = [("S7", "Clinical safety invariants linter", SAMD_LINTER_PATH, "clinical"),
+             ("S8", "Design and UX linter", DESIGN_LINTER_PATH, "ui")]
+    if domains is None:
+        for gid, name, _, _ in names:
+            gate(findings, gid, name, "NOT_VERIFIED", "No project profile and no --domains: cannot tell whether this gate applies. Pass --domains core,clinical,ui or write the profile.")
+        return
+    wanted = [(g, n, p, k) for g, n, p, k in names if (k == "clinical" and "clinical" in domains) or (k == "ui" and domains & UI_WORDS)]
+    for gid, name, _, kind in names:
+        if not any(g == gid for g, *_ in wanted):
+            gate(findings, gid, name, "NOT_APPLICABLE", f"Domain '{kind}' is not in the project's packs ({', '.join(sorted(domains)) or 'none'})")
+    if not wanted:
+        return
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(wanted)) as ex:
+        futs = {gid: ex.submit(run_linter, path, scan_dir) for gid, _, path, _ in wanted}
+    for gid, name, _, _ in wanted:
+        proc = futs[gid].result()
+        try:
+            data = json.loads(proc.stdout)
+        except Exception:
+            data = {}
+        if proc.returncode != 0:
+            gate(findings, gid, name, "VIOLATION", f"Linter failed: {proc.stdout.strip()[:300] or proc.stderr.strip()[:300]}")
+        elif not data.get("files_scanned"):
+            gate(findings, gid, name, "NOT_VERIFIED", f"Scanned 0 files under {scan_dir}. Point --src-dir at the source; a zero-file scan is not evidence.")
+            not_verified.append(f"{name}: scanned 0 files")
+        else:
+            gate(findings, gid, name, "PASS", f"{data['files_scanned']} file(s) scanned, no blockers")
+
+
+# ---------------------------------------------------------------- audit
+
+def parse_domains(ws: Path, override: Optional[str]) -> Optional[Set[str]]:
+    raw = override if override is not None else profile_field(read(ws / ".agents" / "PROJECT_PROFILE.md"), "Domains / packs")
+    raw = re.sub(r"\(inferred[^)]*\)", "", raw or "")
+    # only the leading list counts: stop at the first sentence break or negation ("core only. No UI, no clinical" is just core)
+    raw = re.split(r"[.;\n]|\s-\s|\b(?:no|not|without|none)\b", raw, maxsplit=1, flags=re.I)[0]
+    filler = {"only", "and", "plus", "pack", "packs", "domain", "domains"}
+    toks = {t.strip().lower() for t in re.split(r"[,/\s|]+", raw) if re.fullmatch(r"[a-z][a-z-]*", t.strip().lower())} - filler
+    return toks or None
+
+
+def compute_modified_files_hashes(ws: Path) -> List[Dict[str, str]]:
+    hashes = []
+    try:
+        out = subprocess.check_output(["git", "-C", str(ws), "status", "--porcelain"], stderr=subprocess.DEVNULL, text=True)
         for line in out.splitlines():
-            if not line.strip():
-                continue
-            rel = line[3:].strip().strip('"')
-            if " -> " in rel:
-                rel = rel.split(" -> ", 1)[1].strip()
-            fpath = workspace_dir / rel
-            if fpath.is_file():
-                digest = hashlib.sha256(fpath.read_bytes()).hexdigest()[:16]
-                hashes.append({"file": rel, "sha256_prefix": digest})
+            rel = line[3:].strip().strip('"').split(" -> ")[-1]
+            fp = ws / rel
+            if line.strip() and fp.is_file():
+                hashes.append({"file": rel, "sha256_prefix": hashlib.sha256(fp.read_bytes()).hexdigest()[:16]})
     except Exception:
         pass
     return hashes
 
 
-def init_compliance_log(workspace_dir: Path, feature_name: str) -> Path:
-    """Initializes .agents/SKILL_COMPLIANCE_LOG.md at Phase 0 so the Skill Ambassador tracks compliance live."""
-    agents_dir = workspace_dir / ".agents"
-    agents_dir.mkdir(parents=True, exist_ok=True)
-    log_path = agents_dir / "SKILL_COMPLIANCE_LOG.md"
-    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    content = f"""# 🏛️ MACA v2 Skill Ambassador & Automated Referee Compliance Log
-
-* **Feature / Task Under Audit**: `{feature_name}`
-* **Initialized At**: `{now_iso}`
-* **Skill Ambassador Role**: Independent Procedural Referee (Zero Application Code Authorship)
-
----
-
-## 1. Pre-Flight Mandatory Gate Charter (Locked at Start of Task)
-
-| Gate ID | Mandatory MACA v2 Rule | Required Artifact / Evidence | Status | Ambassador Verdict & Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| **G-01** | **Phase 0 First-Run & Bootstrap** | `./scripts/bootstrap.sh` executed with `exit code 0` | `PENDING` | - |
-| **G-02** | **Phase 1 Spec & Call-Chain Map** | `.agents/SPEC_AND_AUDIT.md` with upstream/downstream callers mapped | `PENDING` | - |
-| **G-03** | **Phase 1.5 Visual Mock Gate** | `.agents/mocks/<feature>.html` or `.svg` approved by User before logic coding | `PENDING` | - |
-| **G-04** | **Phase 3 Tabula Rasa Diff Audit** | Independent peer critique in `.agents/AI_HANDOFF_LEDGER.md` (No fake `[In-Process]`) | `PENDING` | - |
-| **G-05** | **Phase 4.1 Scenario Mode Choice** | User presented Mode A (Predefined), Mode B (Imaginary), or Mode C (Custom) | `PENDING` | - |
-| **G-06** | **Phase 4.2 Anti-Bulk-Mock Rule** | Fast-forward intake + sequential step-by-step entry ($T_0 \\to T_1 \\to T_2$) | `PENDING` | - |
-| **G-07** | **Phase 4.3 Call-Chain & SaMD AST Lint** | `lint_samd_invariants.py` (Zero Hard-Delete, JVM <35 args, RBAC claims) passed | `PENDING` | - |
-| **G-08** | **Phase 4.4 3-Layer + Geometric Oracle** | Domain + DB + UI Bounding-Box (`>=120dp` flex) + 6-Row Auth Fuzz Matrix verified | `PENDING` | - |
-| **G-09** | **Task Queue Sync (`current_task.md`)** | Completed item updated from `- [ ]` to `- [x]` with inline command/date proof | `PENDING` | - |
-| **G-10** | **Phase 4.4 4-Pillar Design & UX Audit** | `lint_design_and_ux.py` (Tokens, SVG/RTL Icons, WCAG AA >=4.5:1, 5 UI States, <=3 Taps) | `PENDING` | - |
-
----
-
-## 2. Live Agent Evaluation & Skill Friction Log (سجل تقييم أداء الـ Agents ومشاكل المهارة)
-
-| Timestamp | Agent / Lane Evaluated | Rule / Phase Tested | Compliance (`PASS` / `VIOLATION`) | Observed Friction or Defect in Skill Execution | Recommended Skill Adjustment |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `{now_iso}` | `Antigravity Orchestrator` | `Phase 0 Init` | `PASS` | Skill Ambassador Charter initialized cleanly. | None |
-
----
-
-## 3. Final Ambassador Sign-Off & Cryptographic Verification
-* **Overall Skill Compliance Score**: `PENDING`
-* **Unresolved Procedural Violations**: `NONE YET`
-* **Release / Commit Authorization by Ambassador**: `LOCKED UNTIL G-01..G-10 PASS`
-"""
-    log_path.write_text(content, encoding="utf-8")
-    return log_path
-
-
-def audit_workspace_compliance(workspace_dir: Path, require_ui_mock: bool = True, auto_write_proof: bool = False) -> Dict[str, Any]:
-    if not workspace_dir.exists() or not workspace_dir.is_dir():
-        raise FileNotFoundError(f"Workspace directory not found: {workspace_dir}")
-
+def audit_workspace_compliance(ws: Path, domains_override: Optional[str] = None, src_dir: Optional[Path] = None,
+                               max_tier: int = 2, auto_write_proof: bool = False) -> Dict[str, Any]:
+    if not ws.is_dir():
+        raise FileNotFoundError(f"Workspace directory not found: {ws}")
     findings: List[Dict[str, str]] = []
-    passed_gates = 0
-    total_gates = 10 if require_ui_mock else 8
+    not_verified: List[str] = []
+    profile = read(ws / ".agents" / "PROJECT_PROFILE.md")
+    ledger = read(ws / ".agents" / "AI_HANDOFF_LEDGER.md") or read(ws / "AI_HANDOFF_LEDGER.md")
+    domains = parse_domains(ws, domains_override)
 
-    # 1. Check SPEC_AND_AUDIT.md & Call-Chain Map (G-02)
-    spec_candidates = [workspace_dir / ".agents" / "SPEC_AND_AUDIT.md", workspace_dir / "SPEC_AND_AUDIT.md"]
-    spec_file = next((p for p in spec_candidates if p.exists()), None)
-    spec_text = ""
-    if spec_file:
-        spec_text = spec_file.read_text(encoding="utf-8", errors="ignore")
-        has_call_chain = "call-chain" in spec_text.lower() or "caller" in spec_text.lower()
-        has_oracle = "oracle" in spec_text.lower()
-        if has_call_chain and has_oracle:
-            passed_gates += 1
-            findings.append({"gate": "G-02 (Spec & Call-Chain Map)", "status": "PASS", "detail": f"Verified in {spec_file.name}"})
-        else:
-            findings.append({
-                "gate": "G-02 (Spec & Call-Chain Map)",
-                "status": "VIOLATION",
-                "detail": "SPEC_AND_AUDIT.md exists but is missing the Cross-Function Call-Chain Map or 3-Layer Outcome Oracle."
-            })
+    check_spec(ws, findings)
+    check_reviews(ws, ledger, findings)
+    check_tests(ws, max_tier, findings, not_verified)
+    check_task_queue(ws, findings)
+    check_vendors(ws, profile, ledger, findings)
+    if domains is None:
+        gate(findings, "S6", "UI mock approved by a person", "NOT_VERIFIED", "Domains unknown (no profile, no --domains), so UI applicability is undecided.")
+    elif domains & UI_WORDS:
+        check_ui_mock(ws, ledger, findings)
     else:
-        findings.append({"gate": "G-02 (Spec & Call-Chain Map)", "status": "VIOLATION", "detail": "Missing .agents/SPEC_AND_AUDIT.md"})
+        gate(findings, "S6", "UI mock approved by a person", "NOT_APPLICABLE", f"No UI domain in packs ({', '.join(sorted(domains))})")
+    check_linters(src_dir or ws, domains, findings, not_verified)
 
-    # 2. Check UI Mock Artifact (G-03, if UI task)
-    if require_ui_mock:
-        mocks_dir = workspace_dir / ".agents" / "mocks"
-        mock_files = list(mocks_dir.glob("*.*")) if mocks_dir.exists() else []
-        if mock_files:
-            passed_gates += 1
-            findings.append({"gate": "G-03 (Phase 1.5 UI Mock)", "status": "PASS", "detail": f"Found {len(mock_files)} mock artifact(s)"})
-        else:
-            findings.append({
-                "gate": "G-03 (Phase 1.5 UI Mock)",
-                "status": "VIOLATION",
-                "detail": "No visual mock found in .agents/mocks/ before implementation."
-            })
-
-    # 3. Check AI_HANDOFF_LEDGER.md for Adversarial Diff Audit & 3-Layer Oracle proof (G-04, G-05, G-06, G-08)
-    ledger_candidates = [workspace_dir / ".agents" / "AI_HANDOFF_LEDGER.md", workspace_dir / "AI_HANDOFF_LEDGER.md"]
-    ledger_file = next((p for p in ledger_candidates if p.exists()), None)
-    ledger_text = ""
-    if ledger_file:
-        ledger_text = ledger_file.read_text(encoding="utf-8", errors="ignore")
-        has_round1 = bool(re.search(r"round\s*1|peer\s*(?:review|audit|critique)|tabula\s*rasa", ledger_text, re.IGNORECASE))
-        has_3layer = bool(re.search(r"3-layer|outcome\s*oracle|persistence|sqlcipher|room\s*entity|db\s*layer", ledger_text, re.IGNORECASE))
-        if has_round1:
-            passed_gates += 1
-            findings.append({"gate": "G-04 (Adversarial Diff Audit)", "status": "PASS", "detail": "Round 1 diff audit recorded in ledger."})
-        else:
-            findings.append({"gate": "G-04 (Adversarial Diff Audit)", "status": "VIOLATION", "detail": "Missing Round 1 diff audit in AI_HANDOFF_LEDGER.md."})
-
-        # G-05: Scenario Mode Selector (Mode A/B/C)
-        combined_text = spec_text + " " + ledger_text
-        has_scenario_mode = bool(re.search(r"mode\s*[abc]|scenario\s*mode|--mode|imaginary\s*scenario", combined_text, re.IGNORECASE))
-        if has_scenario_mode:
-            passed_gates += 1
-            findings.append({"gate": "G-05 (Interactive Scenario Mode A/B/C)", "status": "PASS", "detail": "Scenario mode choice documented."})
-        else:
-            findings.append({"gate": "G-05 (Interactive Scenario Mode A/B/C)", "status": "VIOLATION", "detail": "Missing Interactive Scenario Mode (Mode A/B/C) verification record."})
-
-        # G-06: Fast-Forward Intake & Strict Incremental Entry (Anti-Bulk-Mock)
-        has_incremental = bool(re.search(r"incremental|fast-forward|anti-bulk|time-step|t_0|step-by-step", combined_text, re.IGNORECASE))
-        if has_incremental:
-            passed_gates += 1
-            findings.append({"gate": "G-06 (Fast-Forward Intake & Strict Incremental Entry)", "status": "PASS", "detail": "Strict incremental mutation pipeline verified (zero bulk mocks)."})
-        else:
-            findings.append({"gate": "G-06 (Fast-Forward Intake & Strict Incremental Entry)", "status": "VIOLATION", "detail": "Missing incremental sequential entry proof (anti-bulk-mock)."})
-
-        if has_3layer:
-            passed_gates += 1
-            findings.append({"gate": "G-08 (3-Layer & Geometric E2E Oracle)", "status": "PASS", "detail": "3-Layer Outcome Oracle recorded in ledger."})
-        else:
-            findings.append({"gate": "G-08 (3-Layer & Geometric E2E Oracle)", "status": "VIOLATION", "detail": "Missing 3-Layer Outcome Oracle evidence in ledger."})
-    else:
-        findings.append({"gate": "G-04, G-05, G-06 & G-08 (Handoff Ledger)", "status": "VIOLATION", "detail": "Missing .agents/AI_HANDOFF_LEDGER.md"})
-
-    # 4 & 4b. Concurrent Execution of SaMD Linter (G-07) and Design/UX Linter (G-10)
-    linter_tasks = []
-    if SAMD_LINTER_PATH.exists():
-        linter_tasks.append(("samd", [sys.executable, str(SAMD_LINTER_PATH), "--scan-dir", str(workspace_dir)]))
-    if require_ui_mock and DESIGN_LINTER_PATH.exists():
-        linter_tasks.append(("design", [sys.executable, str(DESIGN_LINTER_PATH), "--scan-dir", str(workspace_dir)]))
-
-    linter_results = {}
-    if linter_tasks:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(linter_tasks)) as executor:
-            future_to_kind = {
-                executor.submit(subprocess.run, cmd, capture_output=True, text=True): kind
-                for kind, cmd in linter_tasks
-            }
-            for future in concurrent.futures.as_completed(future_to_kind):
-                kind = future_to_kind[future]
-                linter_results[kind] = future.result()
-
-    if "samd" in linter_results:
-        proc = linter_results["samd"]
-        if proc.returncode == 0 and "NOT_APPLICABLE_NO_SOURCE_FILES" in proc.stdout:
-            passed_gates += 1
-            findings.append({
-                "gate": "G-07 (SaMD Zero-Delete, RBAC & JVM Budget Linter)",
-                "status": "PASS (N/A: 0 source files scanned - not evidence)",
-                "detail": "Linter found no source files under the workspace. Counted as not applicable, never as proof."
-            })
-        elif proc.returncode == 0:
-            passed_gates += 1
-            findings.append({
-                "gate": "G-07 (SaMD Zero-Delete, RBAC & JVM Budget Linter)",
-                "status": "PASS",
-                "detail": "Zero hard-delete SQL, zero fragile RBAC string checks, and constructor budgets < 35 params."
-            })
-        else:
-            findings.append({
-                "gate": "G-07 (SaMD Zero-Delete, RBAC & JVM Budget Linter)",
-                "status": "VIOLATION",
-                "detail": f"Static invariant linter failed: {proc.stdout.strip()}"
-            })
-
-    if "design" in linter_results:
-        d_proc = linter_results["design"]
-        if d_proc.returncode == 0:
-            passed_gates += 1
-            findings.append({
-                "gate": "G-10 (4-Pillar Design, Graphic, UI & UX Linter)",
-                "status": "PASS",
-                "detail": "Zero hardcoded UI hex colors, valid SVG/Vector viewBox, RTL icon mirroring, and WCAG AA verified."
-            })
-        else:
-            findings.append({
-                "gate": "G-10 (4-Pillar Design, Graphic, UI & UX Linter)",
-                "status": "VIOLATION",
-                "detail": f"Design/UX linter reported blockers: {d_proc.stdout.strip()}"
-            })
-
-    # 5. Check SKILL_COMPLIANCE_LOG.md presence (G-01)
-    comp_log = workspace_dir / ".agents" / "SKILL_COMPLIANCE_LOG.md"
-    if comp_log.exists():
-        passed_gates += 1
-        findings.append({"gate": "G-01 (Skill Ambassador Log)", "status": "PASS", "detail": "SKILL_COMPLIANCE_LOG.md active."})
-    else:
-        findings.append({"gate": "G-01 (Skill Ambassador Log)", "status": "VIOLATION", "detail": "Missing .agents/SKILL_COMPLIANCE_LOG.md (Run --init-log first)."})
-
-    # 6. Check Task Queue synchronization (G-09)
-    task_candidates = [
-        workspace_dir / "tasks" / "current_task.md",
-        workspace_dir / "current_task.md",
-        workspace_dir / ".agents" / "PLAN_TASKS.md"
-    ]
-    task_file = next((p for p in task_candidates if p.exists()), None)
-    if task_file:
-        t_text = task_file.read_text(encoding="utf-8", errors="ignore")
-        checked = len(re.findall(r"^\s*-\s*\[x\]", t_text, re.MULTILINE | re.IGNORECASE))
-        passed_gates += 1
-        findings.append({"gate": "G-09 (Task Queue Sync)", "status": "PASS", "detail": f"Found {task_file.name} ({checked} item(s) checked off [x])."})
-    else:
-        findings.append({"gate": "G-09 (Task Queue Sync)", "status": "VIOLATION", "detail": "Missing tasks/current_task.md or .agents/PLAN_TASKS.md."})
-
-    compliance_pct = round((passed_gates / total_gates) * 100)
+    applicable = [f for f in findings if f["status"] != "NOT_APPLICABLE"]
+    passed = sum(1 for f in applicable if f["status"] == "PASS")
     violations = [f for f in findings if f["status"] == "VIOLATION"]
-    verdict = "APPROVED" if not violations else "BLOCKED_BY_SKILL_VIOLATIONS"
-    file_hashes = compute_modified_files_hashes(workspace_dir)
-
+    unverified = [f for f in findings if f["status"] == "NOT_VERIFIED"]
+    verdict = "BLOCKED_BY_SKILL_VIOLATIONS" if violations else ("INCOMPLETE_NOT_VERIFIED" if unverified else "APPROVED")
+    assumptions = records(ledger, "ASSUMPTION")
     report = {
         "ambassador_verdict": verdict,
-        "compliance_score_pct": compliance_pct,
-        "gates_passed": passed_gates,
-        "total_gates_checked": total_gates,
+        "compliance_score_pct": round(100 * passed / len(applicable)) if applicable else 0,
+        "gates_passed": passed,
+        "total_gates_applicable": len(applicable),
         "violations_count": len(violations),
+        "not_verified_count": len(unverified),
+        "not_run_or_not_verified": not_verified,
+        "assumptions_recorded": len(assumptions),
         "findings": findings,
-        "audited_file_hashes": file_hashes
+        "audited_file_hashes": compute_modified_files_hashes(ws),
     }
-
-    if auto_write_proof and comp_log.exists():
-        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    log = ws / ".agents" / "SKILL_COMPLIANCE_LOG.md"
+    if auto_write_proof and log.exists():
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         rows = "\n".join(f"| `{f['gate']}` | **{f['status']}** | {f['detail']} |" for f in findings)
-        hash_rows = "\n".join(f"  - `{h['file']}` (`sha256:{h['sha256_prefix']}`)" for h in file_hashes) or "  - *(Clean working tree)*"
-        proof_block = f"""
-
----
-
-## 4. Automated Referee Proof (`--verify` executed at `{now_iso}`)
-* **Verdict**: `{verdict}` (**{compliance_pct}%** — `{passed_gates}/{total_gates}` gates passed)
-
-| Gate | Status | Deterministic Audit Proof |
-| :--- | :--- | :--- |
-{rows}
-
-* **Cryptographic File Hashes Verified**:
-{hash_rows}
-"""
-        comp_log.write_text(comp_log.read_text(encoding="utf-8") + proof_block, encoding="utf-8")
-
+        hashes = "\n".join(f"  - `{h['file']}` (`sha256:{h['sha256_prefix']}`)" for h in report["audited_file_hashes"]) or "  - *(no changed files visible to git)*"
+        log.write_text(read(log) + f"\n---\n\n## Referee proof (`--verify` at `{now}`)\n* **Verdict**: `{verdict}` ({passed}/{len(applicable)} applicable gates passed)\n\n"
+                       f"| Gate | Status | Proof |\n| :--- | :--- | :--- |\n{rows}\n\n* **File hashes**:\n{hashes}\n", encoding="utf-8")
     return report
 
 
+def init_compliance_log(ws: Path, feature: str) -> Path:
+    d = ws / ".agents"
+    d.mkdir(parents=True, exist_ok=True)
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    p = d / "SKILL_COMPLIANCE_LOG.md"
+    p.write_text(f"""# MACA Compliance Log
+
+* **Feature**: `{feature}`
+* **Initialized**: `{now}`
+* The referee (`scripts/skill_ambassador_auditor.py --verify`) appends its proof below. It reads structured
+  records (`REVIEW:`, `APPROVAL:`, `ASSUMPTION:` in the ledger, `ORACLE-<id>:` in the spec), not keywords.
+
+| Gate | What must be true |
+| :--- | :--- |
+| S1 | Spec has a filled call-chain map and at least one `ORACLE-<id>:` line |
+| S2 | A `REVIEW:` record exists whose reviewer differs from the author, with independence level and evidence |
+| S3 | Every test up to the tier ceiling has a passing record with identical deps (`impact_and_cache.py`) |
+| S4 | Every ticked task has a `command` and a date |
+| S5 | Every external vendor that ran is approved by the profile or by a human `APPROVAL:` record |
+| S6 | UI projects: a mock exists and a person approved it |
+| S7 / S8 | Clinical / UI linters, only where the profile's packs call for them; a 0-file scan is NOT_VERIFIED |
+""", encoding="utf-8")
+    return p
+
+
+# ---------------------------------------------------------------- self-test
+
 def run_self_test() -> None:
     checks = []
+
+    def seed(ws: Path, domains="core", ledger="", spec=None, task=None):
+        a = ws / ".agents"
+        a.mkdir(parents=True, exist_ok=True)
+        (a / "PROJECT_PROFILE.md").write_text(f"- **Domains / packs** (core, ui, clinical): {domains}\n- **Approved vendors** (names or none): none\n", encoding="utf-8")
+        (a / "SPEC_AND_AUDIT.md").write_text(spec if spec is not None else
+            "## Call-chain map\n| target | callers |\n| :-- | :-- |\n| add() | cli.main |\n\n## Outcomes\n- ORACLE-1: add('x') then list() has length 1\n", encoding="utf-8")
+        (a / "AI_HANDOFF_LEDGER.md").write_text(ledger, encoding="utf-8")
+        (ws / "src").mkdir(exist_ok=True)
+        (ws / "src" / "t.js").write_text("exports.a = 1\n", encoding="utf-8")
+        (ws / "t.test.js").write_text("// t\n", encoding="utf-8")
+        (a / "TEST_MANIFEST.json").write_text(json.dumps({"tests": [{"id": "UNIT-t", "tier": 1, "cmd": "node t.test.js", "deps": ["src/t.js", "t.test.js"], "covers": ["ORACLE-1"]}]}), encoding="utf-8")
+        if task:
+            (ws / "tasks").mkdir(exist_ok=True)
+            (ws / "tasks" / "current_task.md").write_text(task, encoding="utf-8")
+
+    def record_pass(ws: Path):
+        subprocess.run([sys.executable, str(CACHE_PATH), "record", "--ws", str(ws), "--id", "UNIT-t", "--status", "pass", "--note", "selftest"], check=True, capture_output=True)
+
+    good_review = "REVIEW: id=R-1 author=builder-a reviewer=reviewer-b independence=same-family round=1 evidence=review.md verdict=pass\n"
+
     with tempfile.TemporaryDirectory() as tmp:
-        ws = Path(tmp)
-        log_path = init_compliance_log(ws, "Inbox Broadcast Area")
-        assert log_path.exists()
-        checks.append("Skill Ambassador Charter Initialization (--init-log): PASS")
+        root = Path(tmp)
 
-        incomplete = audit_workspace_compliance(ws, require_ui_mock=True)
-        assert incomplete["ambassador_verdict"] == "BLOCKED_BY_SKILL_VIOLATIONS"
-        checks.append("Incomplete Workspace Violation Detection: PASS")
+        ws = root / "empty"; ws.mkdir()
+        assert audit_workspace_compliance(ws)["ambassador_verdict"] == "BLOCKED_BY_SKILL_VIOLATIONS"
+        checks.append("empty workspace is blocked: PASS")
 
-        (ws / ".agents" / "mocks").mkdir(parents=True, exist_ok=True)
-        (ws / ".agents" / "mocks" / "inbox_area.html").write_text("<div>Mock</div>", encoding="utf-8")
-        (ws / ".agents" / "SPEC_AND_AUDIT.md").write_text("Call-Chain Map and 3-Layer Outcome Oracle", encoding="utf-8")
-        (ws / ".agents" / "AI_HANDOFF_LEDGER.md").write_text("Round 1 Diff Audit + 3-Layer Persistence Oracle + Mode A Scenario + Incremental Time-Step Entry", encoding="utf-8")
-        (ws / "tasks").mkdir(parents=True, exist_ok=True)
-        (ws / "tasks" / "current_task.md").write_text("- [x] Inbox feature verified\n", encoding="utf-8")
+        ws = root / "keywords"; ws.mkdir(); seed(ws, ledger="Round 1 peer review tabula rasa. Mode A scenario. Incremental step-by-step. Persistence 3-layer outcome oracle.\n"); record_pass(ws)
+        r = audit_workspace_compliance(ws)
+        assert any(f["gate"].startswith("S2") and f["status"] == "VIOLATION" for f in r["findings"]), r
+        checks.append("keyword-stuffed ledger without a REVIEW record is rejected: PASS")
 
-        complete = audit_workspace_compliance(ws, require_ui_mock=True, auto_write_proof=True)
-        assert complete["ambassador_verdict"] == "APPROVED"
-        assert complete["compliance_score_pct"] == 100
-        assert "Automated Referee Proof" in log_path.read_text(encoding="utf-8")
-        checks.append("Compliant Workspace 100% Verification & Auto-Ledger Proof (--verify): PASS")
+        ws = root / "selfreview"; ws.mkdir(); seed(ws, ledger=good_review.replace("reviewer-b", "builder-a")); (ws / "review.md").write_text("x"); record_pass(ws)
+        assert any(f["gate"].startswith("S2") and f["status"] == "VIOLATION" for f in audit_workspace_compliance(ws)["findings"])
+        checks.append("reviewer equal to author is rejected: PASS")
 
-    print(json.dumps({
-        "self_test_status": "PASS",
-        "checks_executed": len(checks),
-        "details": checks
-    }, indent=2))
+        ws = root / "good"; ws.mkdir(); seed(ws, ledger=good_review, task="- [x] add todos `node t.test.js` 2026-10-31\n"); (ws / "review.md").write_text("ok"); record_pass(ws)
+        r = audit_workspace_compliance(ws)
+        assert r["ambassador_verdict"] == "APPROVED", r
+        assert any(f["status"] == "NOT_APPLICABLE" for f in r["findings"])
+        assert r["total_gates_applicable"] < len(r["findings"])
+        checks.append("plain project with evidence is APPROVED and clinical/UI gates are NOT_APPLICABLE, not failed: PASS")
+
+        m = json.loads((ws / ".agents" / "TEST_MANIFEST.json").read_text()); m["tests"][0]["always"] = True
+        (ws / ".agents" / "TEST_MANIFEST.json").write_text(json.dumps(m)); record_pass(ws)
+        assert audit_workspace_compliance(ws)["ambassador_verdict"] == "APPROVED", "always test with a current recorded pass must not block"
+        checks.append("always:true test with a pass recorded on current deps does not block close: PASS")
+        m["tests"][0]["always"] = False; (ws / ".agents" / "TEST_MANIFEST.json").write_text(json.dumps(m))
+
+        (ws / "src" / "t.js").write_text("exports.a = 2\n", encoding="utf-8")
+        r = audit_workspace_compliance(ws)
+        assert any(f["gate"].startswith("S3") and f["status"] == "VIOLATION" for f in r["findings"]), r
+        checks.append("changed dependency makes the cached test stale again: PASS")
+
+        ws = root / "uncovered"; ws.mkdir(); seed(ws, ledger=good_review, spec=None); (ws / "review.md").write_text("ok")
+        spec = (ws / ".agents" / "SPEC_AND_AUDIT.md").read_text() + "- ORACLE-2: add('') is rejected and nothing is stored\n"
+        (ws / ".agents" / "SPEC_AND_AUDIT.md").write_text(spec); record_pass(ws)
+        r = audit_workspace_compliance(ws)
+        assert any(f["gate"].startswith("S3") and f["status"] == "VIOLATION" and "ORACLE-2" in f["detail"] for f in r["findings"]), r
+        checks.append("an oracle that no registered test covers blocks the test gate: PASS")
+
+        ws = root / "prose"; ws.mkdir(); seed(ws, domains="core only. No clinical data, no UI, no auth (inferred - confirm)", ledger=good_review); (ws / "review.md").write_text("ok"); record_pass(ws)
+        assert parse_domains(ws, None) == {"core"}, parse_domains(ws, None)
+        assert audit_workspace_compliance(ws)["ambassador_verdict"] == "APPROVED"
+        checks.append("prose after the domain list ('No clinical, no UI') is not read as domains: PASS")
+
+        ws = root / "tick"; ws.mkdir(); seed(ws, ledger=good_review, task="- [x] done with no proof\n"); (ws / "review.md").write_text("ok"); record_pass(ws)
+        assert any(f["gate"].startswith("S4") and f["status"] == "VIOLATION" for f in audit_workspace_compliance(ws)["findings"])
+        checks.append("task ticked without command and date is rejected: PASS")
+
+        ws = root / "clinical"; ws.mkdir(); seed(ws, domains="core, clinical", ledger=good_review); (ws / "review.md").write_text("ok"); record_pass(ws)
+        (root / "emptydir").mkdir()
+        r = audit_workspace_compliance(ws, src_dir=root / "emptydir")
+        assert any(f["gate"].startswith("S7") and f["status"] == "NOT_VERIFIED" for f in r["findings"]) and r["ambassador_verdict"] != "APPROVED", r
+        checks.append("applicable linter that scanned 0 files is NOT_VERIFIED, never a pass: PASS")
+
+        ws = root / "ui"; ws.mkdir(); seed(ws, domains="web-app", ledger=good_review); (ws / "review.md").write_text("ok"); record_pass(ws)
+        (ws / ".agents" / "mocks").mkdir(); (ws / ".agents" / "mocks" / "m.html").write_text("<div/>")
+        assert any(f["gate"].startswith("S6") and f["status"] == "VIOLATION" for f in audit_workspace_compliance(ws, src_dir=root / "emptydir")["findings"])
+        (ws / ".agents" / "AI_HANDOFF_LEDGER.md").write_text(good_review + "APPROVAL: what=ui-mock by=orchestrator date=2026-10-31\n")
+        assert any(f["gate"].startswith("S6") and f["status"] == "VIOLATION" for f in audit_workspace_compliance(ws, src_dir=root / "emptydir")["findings"])
+        (ws / ".agents" / "AI_HANDOFF_LEDGER.md").write_text(good_review + "APPROVAL: what=ui-mock by=Dr.Sara date=2026-10-31\n")
+        assert any(f["gate"].startswith("S6") and f["status"] == "PASS" for f in audit_workspace_compliance(ws, src_dir=root / "emptydir")["findings"])
+        checks.append("UI mock needs approval recorded by a person, not the orchestrator: PASS")
+
+        ws = root / "vendor"; ws.mkdir(); seed(ws, ledger=good_review); (ws / "review.md").write_text("ok"); record_pass(ws)
+        (ws / ".agents" / "fleet-runs" / "x" / "codex").mkdir(parents=True)
+        assert any(f["gate"].startswith("S5") and f["status"] == "VIOLATION" for f in audit_workspace_compliance(ws)["findings"])
+        (ws / ".agents" / "PROJECT_PROFILE.md").write_text("- **Domains / packs** (x): core\n- **Approved vendors** (x): codex\n")
+        assert any(f["gate"].startswith("S5") and f["status"] == "PASS" for f in audit_workspace_compliance(ws)["findings"])
+        checks.append("vendor run without approval is a violation; approval in the profile clears it: PASS")
+
+        tpl = (SCRIPT_DIR.parent / "resources" / "templates" / "PROJECT_PROFILE.template.md").read_text(encoding="utf-8")
+        assert profile_field(tpl, "Approved vendors") == "" and profile_field(tpl, "Domains / packs") == "", "unedited template must not grant anything"
+        checks.append("unedited profile template grants no vendor approval and no domains: PASS")
+
+        ws = root / "noprofile"; ws.mkdir(); seed(ws, ledger=good_review); (ws / "review.md").write_text("ok"); record_pass(ws)
+        (ws / ".agents" / "PROJECT_PROFILE.md").unlink()
+        r = audit_workspace_compliance(ws)
+        assert r["ambassador_verdict"] == "INCOMPLETE_NOT_VERIFIED", r
+        checks.append("missing profile makes domain gates NOT_VERIFIED instead of silently skipped: PASS")
+
+        ws = root / "log"; ws.mkdir(); seed(ws, ledger=good_review); (ws / "review.md").write_text("ok"); record_pass(ws)
+        lp = init_compliance_log(ws, "demo")
+        audit_workspace_compliance(ws, auto_write_proof=True)
+        assert "Referee proof" in lp.read_text(encoding="utf-8")
+        checks.append("compliance log initialisation and proof append: PASS")
+
+    print(json.dumps({"self_test_status": "PASS", "checks_executed": len(checks), "details": checks}, indent=2))
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="MACA v2 Skill Ambassador & Automated Pre-Commit Referee")
-    parser.add_argument("--self-test", action="store_true", help="Run built-in verification self-tests and exit")
-    parser.add_argument("--init-log", type=str, metavar="WORKSPACE_DIR", help="Initialize .agents/SKILL_COMPLIANCE_LOG.md in workspace")
-    parser.add_argument("--feature", type=str, default="Active Feature Slice", help="Feature name for --init-log")
-    parser.add_argument("--audit-workspace", type=str, metavar="WORKSPACE_DIR", help="Audit workspace for MACA skill compliance")
-    parser.add_argument("--verify", type=str, metavar="WORKSPACE_DIR", help="Run full MACA v2 automated referee check and append cryptographic proof to SKILL_COMPLIANCE_LOG.md")
-    parser.add_argument("--no-ui-mock", action="store_true", help="Skip Phase 1.5 UI mock requirement for backend-only tasks")
-
+    ap = argparse.ArgumentParser(description="MACA evidence-based referee")
+    ap.add_argument("--self-test", action="store_true")
+    ap.add_argument("--init-log", metavar="WORKSPACE_DIR")
+    ap.add_argument("--feature", default="Active Feature Slice")
+    ap.add_argument("--audit-workspace", metavar="WORKSPACE_DIR", help="Audit without writing to the compliance log")
+    ap.add_argument("--verify", metavar="WORKSPACE_DIR", help="Audit and append the proof to .agents/SKILL_COMPLIANCE_LOG.md if it exists")
+    ap.add_argument("--domains", help="Override the profile, e.g. core,fintech or core,clinical,ui")
+    ap.add_argument("--src-dir", help="Directory the linters scan (default: the workspace)")
+    ap.add_argument("--max-tier", type=int, default=2, help="Tier ceiling for the test-evidence gate (default 2; use 3 at close)")
+    ap.add_argument("--no-ui-mock", action="store_true", help="Deprecated: set the domains instead; kept so old calls do not break")
     try:
-        args = parser.parse_args()
-
+        args = ap.parse_args()
         if args.self_test:
-            run_self_test()
-            return
-
+            return run_self_test()
         if args.init_log:
-            log_file = init_compliance_log(Path(args.init_log).resolve(), args.feature)
-            print(json.dumps({
-                "status": "INITIALIZED",
-                "compliance_log_path": str(log_file),
-                "feature": args.feature
-            }, indent=2))
+            p = init_compliance_log(Path(args.init_log).resolve(), args.feature)
+            print(json.dumps({"status": "INITIALIZED", "compliance_log_path": str(p), "feature": args.feature}, indent=2))
             return
-
-        target_ws = args.verify or args.audit_workspace
-        if target_ws:
-            report = audit_workspace_compliance(
-                Path(target_ws).resolve(),
-                require_ui_mock=not args.no_ui_mock,
-                auto_write_proof=bool(args.verify)
-            )
+        target = args.verify or args.audit_workspace
+        if target:
+            report = audit_workspace_compliance(Path(target).resolve(), args.domains, Path(args.src_dir).resolve() if args.src_dir else None,
+                                                args.max_tier, bool(args.verify))
             print(json.dumps(report, indent=2))
-            sys.exit(0 if report["ambassador_verdict"] == "APPROVED" else 1)
-
-        parser.print_help()
+            sys.exit({"APPROVED": 0, "BLOCKED_BY_SKILL_VIOLATIONS": 1}.get(report["ambassador_verdict"], 3))
+        ap.print_help()
+    except SystemExit:
+        raise
     except Exception as exc:
-        emit_fail_closed_error(
-            type(exc).__name__,
-            str(exc),
-            "Run 'python3 scripts/skill_ambassador_auditor.py --self-test' to verify the Skill Ambassador auditor."
-        )
+        emit_fail_closed_error(type(exc).__name__, str(exc), "Run 'python3 scripts/skill_ambassador_auditor.py --self-test' to verify the referee.")
 
 
 if __name__ == "__main__":

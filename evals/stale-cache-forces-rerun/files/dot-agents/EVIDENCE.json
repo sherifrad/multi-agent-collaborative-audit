@@ -1,0 +1,38 @@
+{
+  "tests": {
+    "UNIT-pricing": {
+      "status": "pass",
+      "dep_hash": "a5e894be6141f67da0404357a3ea4f4aea2810aed4fd7e8e35e3e6563ced0e1d",
+      "files": {
+        "src/pricing.js": "4632be94627c551d29e2a265e8064869895aeab9b4fd32a1eb57341237746be7",
+        "test/pricing.test.js": "0eecf47c7e86c6fa1aa8d517ad05bc37e42c54e3fdd0b7b977d7fbe308de8d2f"
+      },
+      "cmd": "node test/pricing.test.js",
+      "ts": "2026-10-31T10:02:34Z",
+      "note": "baseline"
+    },
+    "UNIT-currency": {
+      "status": "pass",
+      "dep_hash": "d07e892ae3abb415500735b3b6d0fa5f6eee4c442a37218261ba5a4c40db117d",
+      "files": {
+        "src/currency.js": "8f419412c9e50d949257611b63c8dc6ebb6a59cf7253f6ac76e53c608a07146d",
+        "test/currency.test.js": "ab2279bfe26ad04e89c72b756d2b790d5cf34e96c1cb99227844064c6dc474b3"
+      },
+      "cmd": "node test/currency.test.js",
+      "ts": "2026-10-31T10:02:34Z",
+      "note": "baseline"
+    },
+    "INT-checkout": {
+      "status": "pass",
+      "dep_hash": "c67a89c1e1dee3e69bb10b13c69540bc511cb98e8a2a0618821b049f62807801",
+      "files": {
+        "src/checkout.js": "38670bbc891216049a8db3ba346093ed780532a8597689ba32b0cb34bf9d7c9b",
+        "src/pricing.js": "4632be94627c551d29e2a265e8064869895aeab9b4fd32a1eb57341237746be7",
+        "test/checkout.test.js": "f29379964a13b045254325a9a42ca28f6dc2efcce8b0163d9c5aaf9e5370fdde"
+      },
+      "cmd": "node test/checkout.test.js",
+      "ts": "2026-10-31T10:02:34Z",
+      "note": "baseline"
+    }
+  }
+}
