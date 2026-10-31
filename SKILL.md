@@ -232,5 +232,5 @@ Details in `references/token_economy.md`. In short:
 | `references/e2e_and_call_chain_testing.md` | Android/Kotlin, Compose or clinical stacks (an optional recipe, not part of the core) |
 | `references/ui_ux_mocking.md` | Any UI change |
 | `references/ponytail_ladder.md`, `references/coding_guidelines.md` | Phase 2 |
-| `references/deep_diagnostics.md` | Optional T4 profiling |
+| `references/deep_diagnostics.md` | Optional T4 profiling (stack-neutral; see pack DIAGNOSTICS.md files for platform/domain specifics) |
 | `resources/templates/*` | Intake, Phase 0 and 1b, to seed `.agents/` files (PROJECT_PROFILE, SPEC, LEDGER, TEST_MANIFEST) |

@@ -11,7 +11,8 @@ adds checks, it never replaces the core workflow. Several packs can apply at onc
 | Finance / payments | money, ledgers, invoices, PCI, crypto | `packs/fintech.md` |
 | Systems / performance | C/C++/Rust/Go runtimes, embedded, audio/graphics, concurrency | `packs/systems.md` |
 | Data / ETL | pipelines, migrations, reports, scripts over data | `packs/data-etl.md` |
-| Health / safety-critical (directions only) | patient data, decision rules, medical device software | `packs/clinical/PACK.md` |
+| Health / safety-critical (directions only) | patient data, decision rules, medical device software | `packs/clinical/PACK.md` (and `packs/clinical/DIAGNOSTICS.md`) |
+| Android (diagnostics only, no gate) | Android apps, mobile runtime diagnostics | `packs/android/DIAGNOSTICS.md` |
 
 If the profile is silent, infer from the repo (file names, dependencies, keywords) and write the guess in
 the profile marked `(inferred - confirm)`. Do not load the clinical pack on keywords alone when the stated
