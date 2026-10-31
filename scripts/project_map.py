@@ -33,7 +33,8 @@ MAX_READ = 16384
 # (aspect, criticality, directory or file-name words). Matched against path segments / the file stem.
 SEGMENT_RULES = [
     ("data_schema", 3, {"migrations", "migration", "migrate", "alembic", "schema", "schemas"}),
-    ("auth_security", 3, {"auth", "authentication", "authorization", "oauth", "security", "crypto", "secrets", "permissions", "rbac", "acl", "iam", "sso"}),
+    ("auth_security", 3, {"auth", "authentication", "authorization", "oauth", "security", "crypto", "secrets", "permissions", "rbac", "acl", "iam", "sso", "keystore", "keystores", "vault", "biometric", "credentials", "credential", "signing"}),
+    ("clinical_safety", 3, {"patient", "patients", "clinical", "dosage", "dose", "medication", "diagnosis", "gestational", "gestation", "obstetric", "pregnancy", "triage", "redating", "emr", "ehr", "phi", "hipaa"}),
     ("money_billing", 3, {"billing", "payments", "payment", "checkout", "invoice", "invoices", "ledger", "stripe", "wallet"}),
     ("api_integration", 2, {"api", "routes", "controllers", "handlers", "endpoints", "clients", "integrations", "webhooks", "rpc"}),
     ("data_access", 2, {"db", "database", "models", "repositories", "repository", "dao", "queries"}),
@@ -46,23 +47,36 @@ SEGMENT_RULES = [
 CONTENT_RULES = [
     ("data_schema", 1, re.compile(r"\b(alter\s+table|create\s+table|drop\s+table|create\s+index|add\s+column)\b", re.I)),
     ("auth_security", 2, re.compile(r"\b(jwt|bcrypt|argon2|oauth\w*|passlib|pbkdf2|hmac|encrypt\w*|decrypt\w*|private_key|csrf|api[_ ]?key|client_secret)\b", re.I)),
+    ("clinical_safety", 2, re.compile(r"\b(gestational\w*|dosage|medication|trimester|diagnos\w+|obstetric\w*|patient_?id)\b", re.I)),
     ("money_billing", 2, re.compile(r"\b(stripe|paypal|braintree|payment_intent|refund\w*|invoice\w*|billing)\b", re.I)),
 ]
+
+
+def stem_last_is_test(spaced: str) -> bool:
+    stem = spaced.rsplit("/", 1)[-1].rsplit(".", 1)[0].split()
+    return bool(stem) and stem[-1] in ("test", "tests", "spec", "fake", "mock") and len(stem) > 1
 
 
 def classify_path(rel: str) -> Dict[str, Any]:
     p = rel.replace("\\", "/")
     low = p.lower()
+    spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", p).lower()   # GestationalAgeEngine -> gestational age engine
     name = low.rsplit("/", 1)[-1]
     stem, ext = os.path.splitext(name)
     segs = set(low.split("/")[:-1])
-    tokens = set(re.split(r"[/._\- ]", low.rsplit(".", 1)[0] if "." in name else low))   # auth-service/ and billing_service/ count as auth and billing
-    sensitive_words = SEGMENT_RULES[0][2] | SEGMENT_RULES[1][2] | SEGMENT_RULES[2][2]
-    if name.startswith(".env") or ext in (".pem", ".key", ".p12") or name in ("id_rsa",):
+    tokens = set(re.split(r"[/._\- ]", spaced.rsplit(".", 1)[0] if "." in name else spaced))   # auth-service/ and billing_service/ count as auth and billing
+    sensitive_words = set().union(*[w for _, c, w in SEGMENT_RULES if c == 3])
+    if name.startswith(".env") or ext in (".pem", ".key", ".p12", ".jks", ".keystore") or name in ("id_rsa", "local.properties", "keystore.properties", "google-services.json") or "password" in name:
         return {"aspect": "auth_security", "crit": 3}
     if name.endswith((".lock", ".min.js", ".min.css")) or name in ("package-lock.json", "yarn.lock", "poetry.lock", "go.sum", "cargo.lock", "pnpm-lock.yaml"):
         return {"aspect": "dependencies", "crit": 1}
-    if re.search(r"(^|/)(test_[^/]*|[^/]*_test\.[^/]*|[^/]*\.(test|spec)\.[^/]*)$", low):
+    if ext in (".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp"):
+        return {"aspect": "ui_view", "crit": 1}
+    if ext in (".apk", ".aab", ".log", ".zip", ".jar"):
+        return {"aspect": "artifact", "crit": 0}
+    if name == "androidmanifest.xml":
+        return {"aspect": "manifest_permissions", "crit": 2}
+    if re.search(r"(^|/)(test_[^/]*|[^/]*_test\.[^/]*|[^/]*\.(test|spec)\.[^/]*)$", low) or stem_last_is_test(spaced):
         return {"aspect": "tests", "crit": 1}
     if name in ("license", "licence", "changelog") or ext in DOC_EXT and not (tokens & sensitive_words):
         return {"aspect": "docs", "crit": 0}
@@ -233,6 +247,9 @@ def self_test() -> None:
     checks.append("scan works without git, is incremental, treats unmapped paths as 2, lets Risk paths raise only, and the summary fits 15 lines")
     assert c("services/auth-service/login.py") == 3 and c("src/billing_service/worker.py") == 3
     assert c("docs/security.md") == 3 and c("SECURITY.md") != 0 and c("payments/setup.md") == 3 and c("docs/guide.md") == 0
+    assert c("app/src/main/model/GestationalAgeEngine.kt") == 3 and c("storage/PatientAttachmentVault.kt") == 3 and c("keystore/anc.jks") == 3 and c("local.properties") == 3
+    assert c("security/AppLockPolicyTest.kt") == 1 and c("evidence/12_security_settings.png") == 1 and c("app/src/main/AndroidManifest.xml") == 2 and c("build/app.apk") == 0
+    checks.append("CamelCase names are split; clinical, vault and keystore paths are level 3; Kotlin tests, images and APKs are not inflated; the manifest is level 2")
     checks.append("hyphen/underscore directory names and sensitive docs (security.md, payments/) are not demoted")
     print(json.dumps({"self_test_status": "PASS", "checks_executed": len(checks), "details": checks}, indent=2))
 

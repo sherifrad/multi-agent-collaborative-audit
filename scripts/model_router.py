@@ -29,7 +29,7 @@ import project_map  # noqa: E402
 TIERS = ["light", "standard", "frontier"]
 EFFORTS = ["low", "medium", "high"]
 JUDGING = {"builder", "test-designer", "reviewer", "second-reviewer"}
-SENSITIVE = re.compile(r"\b(auth\w*|token|secret|password|passwd|crypto\w*|payment|charge|refund|balance|invoice|migrat\w+|drop\s+table|permission\w*|session|jwt|exec|eval|alter\s+table|create\s+table|api[_ ]?key|private_key|client_secret|billing|stripe|paypal|bcrypt|argon2|hmac|csrf)\b", re.I)
+SENSITIVE = re.compile(r"\b(auth\w*|token|secret|password|passwd|crypto\w*|payment|charge|refund|balance|invoice|migrat\w+|drop\s+table|permission\w*|session|jwt|exec|eval|alter\s+table|create\s+table|api[_ ]?key|private_key|client_secret|billing|dosage|medication|gestational|stripe|paypal|bcrypt|argon2|hmac|csrf)\b", re.I)
 SECRET_SHAPE = re.compile(r"[A-Za-z0-9_]*(api[_-]?key|secret|token|passw(or)?d|private[_-]?key)[A-Za-z0-9_]*\s*[=:]\s*\S+|\bsk_(live|test)_|\bAKIA[0-9A-Z]{16}\b|-----BEGIN [A-Z ]*PRIVATE KEY", re.I)
 RISKY_FILES = ("migrations/", "migration", "schema", ".github/workflows/", "package-lock.json", "yarn.lock", "poetry.lock", "Cargo.lock", "go.sum", "Dockerfile", "permissions", "rbac")
 CODE_EXT = (".py", ".js", ".ts", ".tsx", ".jsx", ".kt", ".java", ".go", ".rs", ".swift", ".rb", ".php", ".c", ".cc", ".cpp", ".cs", ".sql")
