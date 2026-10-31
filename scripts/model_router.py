@@ -29,7 +29,7 @@ import project_map  # noqa: E402
 TIERS = ["light", "standard", "frontier"]
 EFFORTS = ["low", "medium", "high"]
 JUDGING = {"builder", "test-designer", "reviewer", "second-reviewer"}
-SENSITIVE = re.compile(r"\b(auth\w*|token|secret|password|passwd|crypto\w*|payment|charge|refund|balance|invoice|migrat\w+|drop\s+table|permission\w*|session|jwt|exec|eval|alter\s+table|create\s+table|api[_ ]?key|private_key|client_secret|billing|dosage|medication|gestational|stripe|paypal|bcrypt|argon2|hmac|csrf)\b", re.I)
+SENSITIVE = re.compile(r"\b(auth(?:n|z|entic\w*|oriz\w*)?|token|secret|password|passwd|crypto\w*|payment|charge|refund|balance|invoice|migrat\w+|drop\s+table|permission\w*|session|jwt|exec|eval|alter\s+table|create\s+table|api[_ ]?key|private_key|client_secret|billing|dosage|medication|gestational|stripe|paypal|bcrypt|argon2|hmac|csrf)\b", re.I)
 SECRET_SHAPE = re.compile(r"[A-Za-z0-9_]*(api[_-]?key|secret|token|passw(or)?d|private[_-]?key)[A-Za-z0-9_]*\s*[=:]\s*\S+|\bsk_(live|test)_|\bAKIA[0-9A-Z]{16}\b|-----BEGIN [A-Z ]*PRIVATE KEY", re.I)
 RISKY_FILES = ("migrations/", "migration", "schema", ".github/workflows/", "package-lock.json", "yarn.lock", "poetry.lock", "Cargo.lock", "go.sum", "Dockerfile", "permissions", "rbac")
 CODE_EXT = (".py", ".js", ".ts", ".tsx", ".jsx", ".kt", ".java", ".go", ".rs", ".swift", ".rb", ".php", ".c", ".cc", ".cpp", ".cs", ".sql")
@@ -112,7 +112,8 @@ def risk_from_diff(diff: str, numstat: str, risk_paths: List[str]) -> Dict[str, 
 def untracked_as_diff(cwd: Path, limit: int = 200) -> "tuple[str, str]":
     """New files are invisible to `git diff`. Treat each untracked text file as fully added so a new auth or clinical file is scored."""
     diff, numstat = [], []
-    for rel in git(cwd, "ls-files", "--others", "--exclude-standard").splitlines()[:limit]:
+    fresh = [r for r in git(cwd, "ls-files", "--others", "--exclude-standard").splitlines() if not set(r.split("/")[:-1]) & project_map.SKIP_DIRS]
+    for rel in fresh[:limit]:
         try:
             f = cwd / rel
             if f.stat().st_size > 200_000:
@@ -122,7 +123,8 @@ def untracked_as_diff(cwd: Path, limit: int = 200) -> "tuple[str, str]":
             numstat.append(f"1\t0\t{rel}"); continue
         lines = text.splitlines()
         numstat.append(f"{len(lines)}\t0\t{rel}")
-        diff.extend("+" + l for l in lines)
+        if project_map.classify_path(rel)["aspect"] != "artifact":   # run logs and build output are not source; do not score their words
+            diff.extend("+" + l for l in lines)
     return "\n".join(diff) + "\n", "\n".join(numstat) + "\n"
 
 
@@ -287,6 +289,8 @@ def self_test() -> None:
     assert risk_from_diff("", "0\t150\te2e/auth.py\n", [])["class"] == "high" and risk_from_diff("+import bcrypt\n", "1\t0\tdocs/r.md\n", [])["class"] == "high"
     assert risk_from_diff("", "1\t0\tdb/migrations/001.sql\n", [])["class"] == "high"
     assert "secret-shaped value" in risk_from_diff("+STRIPE_API_KEY=sk_live_example\n", "1\t0\tdocs/n.md\n", [])["reasons"][0]
+    assert risk_from_diff("+written by the author, authorship credited\n", "1\t0\tdocs/n.md\n", [])["class"] == "low"
+    assert risk_from_diff("+the request is authorized by the server\n", "1\t0\tdocs/n.md\n", [])["class"] == "high"
     assert risk_from_diff("+see the api key docs\n", "1\t0\tdocs/n.md\n", [])["class"] == "high"   # words still count
     assert risk_from_diff("+Fixed a typo\n", "1\t0\tdocs/n.md\n", [])["class"] == "low"
     assert risk_from_diff("", "1\t0\tweb/x.py\n", ["web/*"])["class"] == "high"

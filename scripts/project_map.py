@@ -72,7 +72,7 @@ def classify_path(rel: str) -> Dict[str, Any]:
         return {"aspect": "dependencies", "crit": 1}
     if ext in (".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp"):
         return {"aspect": "ui_view", "crit": 1}
-    if ext in (".apk", ".aab", ".log", ".zip", ".jar"):
+    if ext in (".apk", ".aab", ".log", ".zip", ".jar", ".out") or name in ("stdout.txt", "stderr.txt"):
         return {"aspect": "artifact", "crit": 0}
     if name == "androidmanifest.xml":
         return {"aspect": "manifest_permissions", "crit": 2}
