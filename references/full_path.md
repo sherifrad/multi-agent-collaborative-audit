@@ -1,0 +1,159 @@
+# MACA Full path: intake, team, dispatch, workflow
+
+Load this only when SKILL.md sent you here (Full path). The Light path never needs it.
+
+## Intake: learn the direction once
+
+MACA is domain-neutral, so it must learn what the project is for before it can pick rules and strictness.
+If `.agents/PROJECT_PROFILE.md` does not exist and the work is Full path, run intake (`references/intake.md`):
+ask the user a short round of questions (purpose, audience, what a serious failure looks like, areas touched,
+build/test commands, cost preference, approvers, approved vendors, model tiers), then write the profile from
+`resources/templates/PROJECT_PROFILE.template.md`. If it exists, read it and do not re-ask. On the Light path
+do not write a profile: infer the few facts you need and say so in `REPORT.md`. If nobody can answer, infer
+from the repo, mark each guess `(inferred - confirm)`, choose the cautious option, and list the guesses first
+in the report. Inference never grants permissions (see "Rules that protect the process" in SKILL.md). The profile selects the domain packs, the
+default weight, tier ceilings and model tiers, and the referee reads its `Domains / packs` and
+`Approved vendors` fields to decide which gates apply.
+
+## 2. The team and who decides
+
+The **orchestrator** is the agent talking to the user (or the one the user names). It routes,
+owns the spec and the ledger, enforces tier ceilings, and reports honestly. On the Full path it does not
+write the code it approves. Everyone else:
+
+| Role | Mode | Job in one line |
+|---|---|---|
+| UI/UX, Core Logic, Data lanes | implementation | Build their slice from a bounded brief; don't cross interfaces |
+| Test Designer | testing | Writes tests and the manifest from the spec only, before looking at the code |
+| Test Runner | testing | Runs the selected tests, records evidence (a script or a cheap model is enough) |
+| Adversarial Reviewer | testing | Audits spec + diff + test results; never sees the author's reasoning |
+| Referee (Full only) | testing | Checks that gates have real evidence; writes no app code |
+
+**Independence rule:** Test Designer != Builder and Reviewer != Author. A review counts only if backed by
+evidence you can point to (command output, a different agent's transcript, a failing-then-passing test).
+When separation is impossible, launch a **fresh process** for the second role (a new subagent, or
+`claude -p` given only the allowed inputs) and label it "same-model review". Re-reading your own work in the
+same context is the last resort and must be labelled as such. Full role table, inputs per role, model
+guidance and handoff format: `references/roles_and_modes.md`.
+
+**Proportionality (cost guardrail).** Match ceremony to size. For a change to one small function or file,
+two fresh-process roles are enough (a tests-first Test Designer and one Reviewer); the orchestrator or a
+single builder writes the code, and extra builder/reviewer processes add cost without adding independence.
+Test volume follows the oracles: boundary and negative cases plus the identity matrix for auth, not
+hundreds of generated permutations. One review round is the default; use the second only if the first found
+a blocker. Say in the report which roles were merged and why.
+
+## 3. Dispatch tiers (use the highest available, degrade gracefully)
+
+1. **External CLIs** through the upstream delegate skills, vendored unmodified in `vendor/delegate-skills/`
+   (source and pinned commit in its `VENDOR.md`; agents: opencode, codex, agy, claude). Do not write your own
+   dispatch code. Follow each skill's loop: write a self-contained brief, run
+   `node vendor/delegate-skills/skills/<agent>-delegate/scripts/relay.mjs --brief <file> --cd <repo>`
+   (add `--read-only` for review), read `result.json`, re-run the gates yourself, then you commit. Several
+   lanes at once: `scripts/fleet_review.sh`. Lanes (which CLI does which kind of work) are the user's
+   `delegate-setup` config (`delegate-fleet.v1`, global or project), not a MACA file. Refresh the vendored copy from
+   the official repo (`amElnagdy/delegate-skills`) before a run that depends on it. Different models give the
+   most independent review.
+2. **Platform subagents**, one per role, each with a clean context.
+3. **Fresh-process fallback**: `claude -p` (or similar) per role with restricted inputs.
+
+Run `bash ./scripts/bootstrap.sh` once per repo to detect what is available (cached afterwards). If it
+reports missing tools, show the user a short table (tool, impact, install command) and continue one tier
+down; never fail silently.
+
+**Fleet selection is mandatory before any dispatch (Phase 0).** Run `python3 scripts/fleet_select.py --cwd <repo>`. It reads
+the installed CLIs, the user's lanes (through `delegate-setup`) and the profile's `Approved vendors` and
+`Write-lane permissions`, then prints the user's archetype (solo, pair or fleet), a role assignment, the best
+independence level reachable, and each withheld vendor with the exact fix; print that as a short table
+(`references/fleet_profiles.md`). It never dispatches or writes. **Then route each role:** for every role you are about to
+spawn or dispatch, run `python3 scripts/model_router.py route --role <role>` and use the model, reasoning effort and fallback chain it
+returns (`references/model_routing.md`). Judging roles never get a light model; helpers never get a frontier one; do not pick a model by
+habit. Pass failures and blockers you measured, never the agent's own report. Run `python3 scripts/project_map.py scan --cwd . --write` once per project (it refreshes incrementally) so the router knows which paths are auth, money or schema; pass `--paths` for files you are about to change. The map and task kind only ever raise the tier or effort.
+Only the human-set `Downgrade paths` line in `.agents/PROJECT_PROFILE.md` (`glob=level`, level 0-2) can lower criticality; an `(inferred)` value grants nothing, level 3 is ignored, and a `Risk paths` match still wins. Run artifacts (`.apk` `.aab` `.log` `.zip` `.jar` `.out`, `stdout.txt`, `stderr.txt`, `result*.json`) and downgraded paths are not scored for content, except that a newly added secret-shaped value still escalates, and the report must tell the human to remove it and rotate it if real.
+If it returns a `stop` (`BUDGET_EXHAUSTED`, `QUOTA_EXHAUSTED`), stop and report; never raise the limit yourself. Solo mode uses the roster in `resources/subagents/`. Then state the review's independence level in the first status
+line: *multi-vendor* (2+ model families), *same-family* (only Claude subagents), or *single-model*. A
+sandbox shell often cannot see CLIs installed on the user's own machine; if the profile expects a fleet and
+none is visible, do not quietly fall back. Write one identical brief file, give the user the exact
+`scripts/fleet_review.sh --brief ... --lane opencode:<model> --lane agy:gemini-3.8-flash-high --lane codex` command to run in
+their terminal, and carry on with the Claude subagent review meanwhile. Merge the vendor outputs when they
+arrive: a finding raised by 2+ families is strong evidence, a finding raised by one is labelled as such.
+Send code and specs only to vendors named in the profile's `Approved vendors` or in a human `APPROVAL:
+what=vendor:<name>` ledger record. A lane in the delegate-setup config is configuration, not approval. With no
+recorded approval, use a local subagent or fresh process and say so. Keep personal data (customer or patient rows, names,
+identifiers, secrets) out of every brief: describe a fixture, never paste it. `scripts/fleet_run.py` runs
+one lane through a chain of fallback models; a writing lane (one allowed to edit files) needs the profile's
+`Write-lane permissions` to name it, otherwise run it read-only.
+
+## 4. Workflow
+
+**Phase 0 - Frame.** Read the task queue (`tasks/current_task.md` or `.agents/PLAN_TASKS.md`) if present.
+Seed `.agents/` from `resources/templates/`. Full path: `python3 ./scripts/skill_ambassador_auditor.py
+--init-log <ws> --feature "<name>"`.
+
+**Phase 1 - Spec (orchestrator).** Write `.agents/SPEC_AND_AUDIT.md`: the requirement in the user's words,
+known fragilities, a **call-chain map** (callers and callees of what will change, at least one real row), and
+**outcome oracles** written as `ORACLE-<id>: <observable result>` lines (what exact result proves success at
+domain, storage and visible-UI level, plus a negative or boundary case). The referee counts those lines. Apply
+the checklists/packs named in the profile (`references/domain_checklists.md`, `packs/clinical/PACK.md`). UI work: produce a mock in `.agents/mocks/` and get a
+person's approval before building logic (`references/ui_ux_mocking.md`); record it as `APPROVAL:
+what=ui-mock by=<person> date=<date>` in the ledger. If nobody can approve, stop at the mock and report.
+
+**Phase 1b - Tests first (testing mode, Full path).** The Test Designer turns each oracle into tests and
+registers them in `.agents/TEST_MANIFEST.json` (template in `resources/templates/`), each with a tier and
+`deps`. Boundary and invalid-input cases included. Every `ORACLE-<id>` must appear in some test's `covers` list; the
+referee blocks an oracle no test targets. Writing them before the code stops tests bending to fit it.
+
+**Phase 2 - Build (implementation mode).** Lanes work from bounded briefs. Prefer the simplest thing that
+meets the spec (`references/ponytail_ladder.md`, `references/coding_guidelines.md`); log deliberate shortcuts
+in the ledger's debt table. After each lane: Tier 0-1 checks on what it touched. Nothing deeper yet.
+
+**Phase 3 - Independent audit (testing mode, max 2 rounds).** The reviewer audits the diff against the spec
+and call-chain map and classifies findings Hard Blocker / Deferred Shortcut / Pass in the ledger. Each round
+leaves one `REVIEW:` record in the ledger (author, reviewer, independence level, evidence, verdict); the
+referee accepts a review only through that record, only when reviewer and author differ, and only when `evidence=` is a saved
+file (for example `.agents/review-r1.md`, not a sentence). `independence=multi-vendor` needs real output under `.agents/fleet-runs/`. A fix for a Hard
+Blocker gets its own re-review (round 2); if you cannot get one, say in the report that the fix was not
+re-reviewed. After round 2,
+unresolved disagreements go to the user with both positions.
+
+**Phase 4 - Verify, economically (testing mode).** Do not rerun everything. Read
+`references/test_economy.md`, then:
+
+```
+python3 scripts/impact_and_cache.py select --ws <ws> --max-tier 2     # shows RUN / REUSE / DEFER
+# run only RUN lines, each through: impact_and_cache.py run --ws <ws> --id <id>   (it executes the manifest cmd and records the real exit code; a pass typed in with `record` is not evidence)
+```
+
+Passed tests are reused only when a hash of everything they depend on is unchanged; failed tests, tests
+marked `always`, and tests with unmatched `deps` always run; tests above the tier ceiling are reported as
+*not run*, never as passed. Do not also run the whole suite "to be safe" in the same round: it spends what the cache saved and contradicts
+any reuse claim. If you do run extra tests, `record` them and drop the reuse claim for those tests. Show the plan line to the user (`Ran 6 | Reused 14 | Deferred 3`) and raise the
+ceiling when risk demands it (changed safety rule, auth, migration). Verification principles, which apply
+to every test you do run, are in `references/verification_principles.md`; stack recipes for the stacks you use (Android/clinical ones live in their packs)
+are in `references/e2e_and_call_chain_testing.md`. For auth changes only a verified identity claim may grant
+admin, so a username-only match must be rejected (`scenario_and_callchain_engine.py --auth-fuzz-matrix`).
+
+**Phase 5 - Close.** If `.agents/PROJECT_PROFILE.md` is missing, do intake first (or infer it and mark each
+guess `(inferred - confirm)`): the referee cannot tell which gates apply without the profile's packs and
+reports the domain gates as `NOT_VERIFIED` rather than guessing. Full path: `python3 ./scripts/skill_ambassador_auditor.py --verify <ws> --src-dir <source
+dir> --max-tier 3`. It reads the records, re-checks the test evidence, and runs the gates of the packs the profile names (a pack's `pack.json` lists its gates)
+only where the profile's packs call for it. Read its verdict literally: `APPROVED` (exit 0) is the only pass;
+`BLOCKED_BY_SKILL_VIOLATIONS` (exit 1) means fix and re-run; `INCOMPLETE_NOT_VERIFIED` (exit 3) means a gate
+applies but could not be checked (unknown domains, a linter that scanned 0 files, a deferred test), and you
+must report it as unverified, never as done. Tick the task queue only after `APPROVED`, with the command and
+date inline. At a release gate run `impact_and_cache.py invalidate --all` and a full
+T3 replay. Deep profiling (T4) only on request: `references/deep_diagnostics.md`.
+
+## 4b. Spending tokens wisely (applies to every phase)
+
+Details in `references/token_economy.md`. In short:
+- **Cache-friendly briefs.** Build every role brief as one shared prefix (`.agents/BRIEF_PREFIX.md`: profile,
+  spec summary, oracle list) followed by a short role-specific part. Stable material first, changing
+  material last, never edit the prefix mid-session, and continue sessions rather than re-uploading files.
+- **Reuse results.** Passed tests via `impact_and_cache.py`; reviews of unchanged diffs by citing the
+  ledger entry.
+- **Harness library.** Before writing a helper script run `python3 scripts/harness.py check --ws <ws> --need
+  "<what it does>"`. `FOUND` -> `harness.py run` it. `PROMOTE` (second time the need appears) -> write it
+  once, `register` it with a self-test, and call it by name from then on. If the user says the task recurs
+  ("every week", "for each export"), write and register the script on first use instead of waiting.
+- **Right model per job.** Strong model for spec and adversarial review; cheap model or a script for runs.

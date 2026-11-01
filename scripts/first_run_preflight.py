@@ -67,6 +67,7 @@ REQUIRED_INTERNAL_FILES = [
     "references/ui_ux_mocking.md",
     "references/coding_guidelines.md",
     "references/deep_diagnostics.md",
+    "references/full_path.md",
     "resources/templates/AGENTS.template.md",
     "resources/templates/AI_HANDOFF_LEDGER.template.md",
     "resources/templates/SPEC_AND_AUDIT.template.md",

@@ -90,7 +90,9 @@ def evidence(work, response):
 
 
 JUDGE = ("You grade one assertion about an AI agent's work. Be strict: pass only if the evidence below shows it. "
-         "Do not credit intentions or claims the evidence contradicts.\n\nASSERTION:\n%s\n\n%s\n\n"
+         "Do not credit intentions or claims the evidence contradicts. The REFEREE FACTS were produced for you by an "
+         "independent script after the run; the agent was not asked to run or cite them, so never penalise the agent for "
+         "not citing them, and a missing .agents/ folder is only a failure when the assertion itself requires one.\n\nASSERTION:\n%s\n\n%s\n\n"
          'Reply with ONLY a JSON object: {"passed": true|false, "evidence": "<one sentence citing the evidence>"}')
 
 
@@ -102,7 +104,7 @@ def judge(assertion, ev, model, budget, timeout):
         j = json.loads(m.group(0))
         return bool(j.get("passed")), str(j.get("evidence", ""))[:300], out.get("total_cost_usd", 0) or 0
     except (AttributeError, ValueError):
-        return False, "judge returned no verdict: " + (out.get("error") or txt[:120]), out.get("total_cost_usd", 0) or 0
+        return None, "judge returned no verdict: " + (out.get("error") or txt[:120]), out.get("total_cost_usd", 0) or 0
 
 
 def run_one(case, arm, trial, a):
@@ -114,15 +116,18 @@ def run_one(case, arm, trial, a):
     out, wall = claude(case["prompt"], work, a.model, a.budget_usd, a.timeout, skills_on=(arm == "with"), tools=TOOLS)
     response = out.get("result", "") if isinstance(out, dict) else ""
     ev = evidence(work, response)
-    results, jcost = [], 0.0
+    results, jcost, invalid = [], 0.0, bool(out.get("error")) if isinstance(out, dict) else True
     for g in case["graders"]:
         ok, why, c = judge(g["text"], ev, a.judge_model, 0.5, 300)
         jcost += c
-        results.append({"id": g["id"], "weight": g["weight"], "passed": ok, "evidence": why})
+        invalid = invalid or ok is None
+        if ok is None and LIMIT_RE.search(why):
+            raise SystemExit("account usage limit reached: %s\nResults so far are kept; resume after it resets." % why)
+        results.append({"id": g["id"], "weight": g["weight"], "passed": bool(ok), "evidence": why})
     total = sum(r["weight"] for r in results) or 1.0
     score = sum(r["weight"] for r in results if r["passed"]) / total
     u = out.get("usage", {}) if isinstance(out, dict) else {}
-    rec = {"case": case["name"], "arm": arm, "trial": trial, "score": score, "graders": results,
+    rec = {"case": case["name"], "arm": arm, "trial": trial, "score": score, "graders": results, "invalid": invalid,
            "error": out.get("error"), "cost_usd": out.get("total_cost_usd", 0) or 0, "judge_cost_usd": jcost,
            "turns": out.get("num_turns", 0), "wall_s": round(wall, 1),
            "tokens": (u.get("input_tokens", 0) + u.get("output_tokens", 0)
@@ -130,6 +135,9 @@ def run_one(case, arm, trial, a):
     with open(os.path.join(base, "record.json"), "w") as f:
         json.dump(rec, f, indent=1)
     return rec
+
+
+LIMIT_RE = re.compile(r"hit your .*limit|rate.?limit|usage limit", re.I)
 
 
 def mean(xs):
@@ -146,6 +154,9 @@ def bootstrap_ci(diffs, n=4000, seed=7):
 
 
 def summarize(recs):
+    bad = lambda r: r.get("invalid") or any("judge returned no verdict" in g["evidence"] for g in r["graders"])
+    skipped = sum(1 for r in recs if bad(r))
+    recs = [r for r in recs if not bad(r)]  # a run whose model or judge failed is not a score of 0
     by = {}
     for r in recs:
         by.setdefault(r["case"], {a: {} for a in ARMS})[r["arm"]][r["trial"]] = r
@@ -164,7 +175,7 @@ def summarize(recs):
                   "turns": mean([r["turns"] for r in rs]), "wall_s": mean([r["wall_s"] for r in rs]),
                   "tokens": mean([r["tokens"] for r in rs]), "errors": sum(1 for r in rs if r["error"]), "runs": len(rs)}
     lo, hi = bootstrap_ci(diffs)
-    return {"cases": cases, "arms": arm, "delta": mean(diffs), "ci": [lo, hi], "pairs": len(diffs),
+    return {"invalid_runs_excluded": skipped, "cases": cases, "arms": arm, "delta": mean(diffs), "ci": [lo, hi], "pairs": len(diffs),
             "verdict": ("skill helps" if lo > 0 else "skill hurts" if hi < 0 else "no measurable difference")}
 
 
@@ -172,6 +183,7 @@ def render(s, recs):
     A, B = s["arms"]["with"], s["arms"]["without"]
     L = ["# Skill before/after report", "",
          "Verdict: **%s** (paired score delta %+.2f, 95%% CI [%+.2f, %+.2f], %d pairs)" % (s["verdict"], s["delta"], s["ci"][0], s["ci"][1], s["pairs"]),
+         "Invalid runs excluded (model or judge failed): %d" % s.get("invalid_runs_excluded", 0),
          "", "| arm | pass score | cost/run | turns | wall s | tokens | errors | runs |", "|---|---|---|---|---|---|---|---|"]
     for n, x in (("with skill", A), ("without", B)):
         L.append("| %s | %.2f | $%.3f | %.1f | %.0f | %.0f | %d | %d |" % (n, x["score"], x["cost"], x["turns"], x["wall_s"], x["tokens"], x["errors"], x["runs"]))
@@ -179,7 +191,7 @@ def render(s, recs):
     for c in s["cases"]:
         flag = "  <- REGRESSION" if c["delta"] < 0 else ""
         L.append("| %s | %.2f | %.2f | %+.2f%s | %d |" % (c["case"], c["with"], c["without"], c["delta"], flag, c["n"]))
-    fails = [r for r in recs if r["arm"] == "with" and r["score"] < 1]
+    fails = [r for r in recs if r["arm"] == "with" and r["score"] < 1 and not r.get("invalid")]
     if fails:
         L += ["", "## Failed assertions with the skill"]
         for r in fails:
@@ -218,6 +230,8 @@ def self_test():
     bad = [mk("x", "with", t, 0.0) for t in range(4)] + [mk("x", "without", t, 1.0) for t in range(4)]
     s = summarize(bad)
     assert s["verdict"] == "skill hurts" and "REGRESSION" in render(s, bad)
+    inv = good + [dict(mk("x", "with", 9, 0.0), invalid=True)]
+    assert summarize(inv)["invalid_runs_excluded"] == 1 and summarize(inv)["verdict"] == "skill helps"
     # stubbed end-to-end: no network, judge says pass
     os.environ["AB_STUB"] = '{"passed": true, "evidence": "stub"}'
     tmp = tempfile.mkdtemp()
