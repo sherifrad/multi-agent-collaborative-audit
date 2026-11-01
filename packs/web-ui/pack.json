@@ -1,8 +1,0 @@
-{
-  "name": "web-ui",
-  "domains": ["ui", "web", "web-app", "mobile", "android", "ios", "frontend", "compose"],
-  "ui_domains": true,
-  "gates": [
-    {"id": "S8", "name": "Design and UX linter", "script": "scripts/lint_design_and_ux.py", "applies_when": ["ui", "web", "web-app", "mobile", "android", "ios", "frontend", "compose"]}
-  ]
-}

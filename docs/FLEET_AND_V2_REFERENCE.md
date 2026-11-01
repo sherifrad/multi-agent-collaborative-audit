@@ -28,7 +28,6 @@
   * [The 4 Verification Pillars](#the-4-verification-pillars)
 * [✂️ The 7-Rung Ponytail Minimalism Engine](#-the-7-rung-ponytail-minimalism-engine)
 * [🏛️ Skill Ambassador & Procedural Compliance Referee](#-skill-ambassador--procedural-compliance-referee)
-* [📊 Telemetry, Cockpit Dashboard & Native Notifications](#-telemetry-cockpit-dashboard--native-notifications)
 * [🚀 Quickstart & Developer Tracks](#-quickstart--developer-tracks)
   * [Track 1: Solo Developer ($0 Zero-API Mode)](#track-1-solo-developer-0-zero-api-mode)
   * [Track 2: Power User (Local AI CLIs)](#track-2-power-user-local-ai-clis)
@@ -162,9 +161,8 @@ Phase 4.5: Deep Diagnostics & Performance Profiling
   ├── Inspect Logcat, memory heap, crashlytics, and system traces
   └── Require explicit User Consent before running heavy instrumentation
 
-Phase 5: Telemetry, Desktop Notification & Final Commit
-  ├── Calculate project health and Ponytail index (scripts/measure_metrics.py)
-  ├── Send native macOS notification (--notify)
+Phase 5: Compliance Verification & Final Commit
+  ├── Run procedural compliance referee (scripts/skill_ambassador_auditor.py --verify)
   └── Produce atomic git commit with full Fleet Dispatch attribution badge
 ```
 
@@ -293,26 +291,6 @@ Verdicts and exit codes: `APPROVED` 0, `BLOCKED_BY_SKILL_VIOLATIONS` 1, `INCOMPL
 
 ---
 
-## 📊 Telemetry, Cockpit Dashboard & Native Notifications
-
-Track project metrics in real time with [`scripts/measure_metrics.py`](scripts/measure_metrics.py).
-
-```bash
-# Launch interactive web dashboard (port 8420)
-./scripts/measure_metrics.py
-
-# Send native macOS desktop notification upon gate or task completion
-./scripts/measure_metrics.py --notify "MACA E2E Complete" "Sequential Oracle & Call-Chain passed!"
-
-# Output structured JSON metrics for CI/CD pipelines
-./scripts/measure_metrics.py --json
-
-# Run built-in self-test verification suite
-./scripts/measure_metrics.py --self-test
-```
-
----
-
 ## 🚀 Quickstart & Developer Tracks
 
 Choose the track that fits your development environment:
@@ -350,7 +328,6 @@ python3 scripts/fleet_run.py --brief brief.md --cd . --out-dir .agents/fleet-run
 | **`fleet_select.py` / `model_router.py` / `fleet_run.py`** | `python3 scripts/<name>.py` | `--self-test` | Fleet plan, model and effort per role, relay runner with fallback |
 | **`scenario_and_callchain_engine.py`** | `python3 scripts/scenario_and_callchain_engine.py` | `--self-test`, `--mode <A/B/C>`, `--trace-dir <dir>` | Anti-bulk-mock sequential oracle & caller graph tracer |
 | **`skill_ambassador_auditor.py`** | `python3 scripts/skill_ambassador_auditor.py` | `--self-test`, `--init-log <dir>`, `--audit-workspace <dir>` | Enforces procedural gates G-01 through G-09 |
-| **`measure_metrics.py`** | `python3 scripts/measure_metrics.py` | `--self-test`, `--notify <Title> <Msg>`, `--json`, `--port <n>` | Telemetry cockpit, notifications & Ponytail analytics |
 
 ---
 

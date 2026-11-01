@@ -50,7 +50,7 @@ default weight, tier ceilings and model tiers, and the referee reads its `Domain
 | **Light** | Small or low-risk change, but a second pair of eyes is wanted | See "Light path rules" |
 | **Full** | Multi-file or multi-lane feature, or any high-assurance domain | Phases 0-5 |
 
-High-stakes signals (auto-select Full and load the matching pack from `packs/INDEX.md`): harm to a person,
+High-stakes signals (auto-select Full and load the matching section from `references/domain_checklists.md` or `packs/clinical/PACK.md`): harm to a person,
 money movement, auth/permissions, regulated data, irreversible data changes, safety-relevant calculations.
 The profile's risk level and cost preference set the defaults.
 
@@ -140,7 +140,7 @@ Seed `.agents/` from `resources/templates/`. Full path: `python3 ./scripts/skill
 known fragilities, a **call-chain map** (callers and callees of what will change, at least one real row), and
 **outcome oracles** written as `ORACLE-<id>: <observable result>` lines (what exact result proves success at
 domain, storage and visible-UI level, plus a negative or boundary case). The referee counts those lines. Apply
-the packs named in the profile (`packs/INDEX.md`). UI work: produce a mock in `.agents/mocks/` and get a
+the checklists/packs named in the profile (`references/domain_checklists.md`, `packs/clinical/PACK.md`). UI work: produce a mock in `.agents/mocks/` and get a
 person's approval before building logic (`references/ui_ux_mocking.md`); record it as `APPROVAL:
 what=ui-mock by=<person> date=<date>` in the ledger. If nobody can approve, stop at the mock and report.
 
@@ -235,7 +235,7 @@ Details in `references/token_economy.md`. In short:
 | `references/test_economy.md` | Phase 4, always on the Full path |
 | `references/verification_principles.md` | Writing or judging any test |
 | `references/intake.md` | First run in a project, or when a task contradicts the profile |
-| `packs/INDEX.md` | Phase 1, to load the packs the profile names (core, fintech, systems, data-etl, clinical, web-ui; each pack may add gates via `pack.json`) |
+| `references/domain_checklists.md` | Phase 1, to load the checklist section matching the profile (core, fintech, systems, data-etl; clinical uses `packs/clinical/PACK.md` and `pack.json`) |
 | `references/token_economy.md` | Writing briefs, choosing models, before writing any helper script |
 | `references/e2e_and_call_chain_testing.md` | Android/Kotlin, Compose or clinical stacks (an optional recipe, not part of the core) |
 | `references/ui_ux_mocking.md` | Any UI change |

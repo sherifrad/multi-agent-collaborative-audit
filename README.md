@@ -128,11 +128,12 @@ Packs add checks; they never contain domain values. Thresholds, doses, rates, en
 
 | Pack | For |
 |---|---|
-| `core` | every project |
-| `fintech` | money, ledgers, payments |
-| `systems` | runtimes, concurrency, performance |
-| `data-etl` | pipelines, migrations, reports |
-| `clinical` | health and other safety-critical software (directions only) |
+| `core` | every project (`references/domain_checklists.md`) |
+| `ui` | web and mobile UI (auto-detected from UI files or set in profile) |
+| `fintech` | money, ledgers, payments (`references/domain_checklists.md`) |
+| `systems` | runtimes, concurrency, performance (`references/domain_checklists.md`) |
+| `data-etl` | pipelines, migrations, reports (`references/domain_checklists.md`) |
+| `clinical` | health and other safety-critical software (`packs/clinical/`, directions only) |
 
 ---
 
@@ -179,15 +180,14 @@ Zero-API mode works with in-IDE subagents. With installed CLIs (`claude`, `codex
 | `skill_ambassador_auditor.py` | procedural gates and compliance log |
 | `lint_samd_invariants.py`, `lint_design_and_ux.py` | safety/auth and UI linters (0 files scanned ≠ evidence) |
 | `first_run_preflight.py`, `bootstrap.sh` | integrity checks and environment discovery |
-| `measure_metrics.py` | telemetry dashboard and notifications |
 
 All scripts use only the Python standard library, support `--self-test`, and **fail closed**.
 
 ## 📚 Reference
 
 * `SKILL.md`: the skill itself
-* `references/`: roles and modes, test economy, token economy, intake, verification principles
-* `docs/FLEET_AND_V2_REFERENCE.md`: the earlier detailed guide to the fleet router, adapters, Ponytail ladder and dashboard
+* `references/`: roles and modes, domain checklists, test economy, token economy, intake, verification principles
+* `docs/FLEET_AND_V2_REFERENCE.md`: the earlier detailed guide to the fleet router, adapters and Ponytail ladder
 
 ---
 

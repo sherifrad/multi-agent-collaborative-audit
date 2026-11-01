@@ -29,7 +29,7 @@ Offer your own guess in each option when the repo already hints at the answer, s
 | Risk low, economy | Light path, tier ceiling T1, one reviewer, no `.agents/` ceremony |
 | Risk medium, balanced | Light or Full by change size, ceiling T2, merged roles allowed |
 | Risk high or safety-critical, thorough | Full path, tests-first, fresh-process reviewer, ceiling T3 at close |
-| Domains list | Which `packs/*` load (see `packs/INDEX.md`) |
+| Domains list | Which section of `references/domain_checklists.md` (and `packs/clinical/PACK.md` for clinical) loads |
 | Model tiers | Which model gets planner/reviewer vs runner roles |
 | Approvals | Who is asked at mock, threshold and release gates |
 

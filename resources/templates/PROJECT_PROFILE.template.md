@@ -7,7 +7,7 @@
 - **Purpose** (what the app is for, in the user's words):
 - **Users / audience** (who uses it, how many, what environment):
 - **Direction** (what "done well" means here; what must never happen):
-- **Domains / packs** (core, web-ui, fintech, systems, data-etl, clinical; any name needs an installed pack in packs/):
+- **Domains / packs** (core, ui, fintech, systems, data-etl, clinical; UI is also auto-detected from changed files):
 - **Risk level** (low | medium | high | safety-critical) and why:
 - **Stack and commands** (language, build, test, lint; how to run one test):
 - **Cost preference** (economy | balanced | thorough): default tier ceilings follow this, see `references/token_economy.md`

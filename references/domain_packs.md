@@ -1,4 +1,4 @@
 # Domain Packs (moved)
 
-Packs now live in `packs/`. Start at `packs/INDEX.md`; the project profile says which apply.
-Clinical rules: `packs/clinical/PACK.md`. This file is kept so older links keep working.
+Domain checklists now live in `references/domain_checklists.md`; the project profile says which sections apply.
+Clinical rules and gates live in `packs/clinical/PACK.md` (`packs/clinical/pack.json`). This file is kept so older links keep working.
