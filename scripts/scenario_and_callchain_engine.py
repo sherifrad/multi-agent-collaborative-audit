@@ -162,7 +162,7 @@ IMAGINARY_CLINICAL_SCENARIOS: List[Dict[str, Any]] = [
 
 def generate_auth_fuzz_matrix(admin_email: str = "admin@example.com") -> Dict[str, Any]:
     """Generates the MACA v2 Tabula Rasa Auth & RBAC Permutation Matrix (Upgrade 2)."""
-    local_part, domain = admin_email.split("@", 1) if "@" in admin_email else (admin_email, "gmail.com")
+    local_part, domain = admin_email.split("@", 1) if "@" in admin_email else (admin_email, "example.com")
     return {
         "upgrade": "MACA v2 Upgrade 2 — Tabula Rasa Auth & RBAC Claim Fuzzing Matrix",
         "target_admin_identity": admin_email,
