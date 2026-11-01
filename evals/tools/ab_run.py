@@ -61,7 +61,7 @@ def claude(prompt, cwd, model, budget, timeout, skills_on, tools=None):
         cmd.append("--disable-slash-commands")
     t0 = time.time()
     try:
-        p = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
         out = json.loads(p.stdout) if p.stdout.strip().startswith("{") else {"error": (p.stderr or p.stdout)[-400:]}
     except subprocess.TimeoutExpired:
         out = {"error": "timeout"}
@@ -72,7 +72,7 @@ def claude(prompt, cwd, model, budget, timeout, skills_on, tools=None):
 
 def sh(cmd, cwd, timeout=60):
     try:
-        p = subprocess.run(cmd, cwd=cwd, shell=True, capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run(cmd, cwd=cwd, shell=True, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
         return (p.stdout + p.stderr).strip()
     except (subprocess.TimeoutExpired, OSError):
         return ""
