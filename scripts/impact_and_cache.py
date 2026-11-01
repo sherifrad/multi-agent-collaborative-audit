@@ -131,6 +131,8 @@ def select(ws, max_tier):
         if by_hand:
             ev = None  # a pass typed in by hand is not evidence; only `run` results count
         row = {"id": tid, "tier": t["tier"], "cmd": t["cmd"], "action": "RUN", "reason": ""}
+        if t.get("covers"):
+            row["covers"] = list(t["covers"])
         if max_tier is not None and t["tier"] > max_tier:
             row.update(action="DEFER", reason=f"tier {t['tier']} above this round's ceiling {max_tier}; NOT RUN, not a pass")
         elif t.get("always"):
@@ -273,10 +275,25 @@ def self_test():
             load_tests(ws); raise AssertionError("no-op cmd accepted")
         except SystemExit:
             pass
+        # Tier-deferred oracle with --max-tier must make the auditor exit 3 (NOT_VERIFIED), not 1 (VIOLATION)
+        (ws / ".agents" / "PROJECT_PROFILE.md").write_text("- **Domains / packs** (x): core\n- **Approved vendors** (x): none\n")
+        (ws / ".agents" / "SPEC_AND_AUDIT.md").write_text(
+            "## Call-chain map\n| target | callers |\n| :-- | :-- |\n| card() | ui |\n\n## Outcomes\n- ORACLE-1: card ok\n- ORACLE-2: e2e flow ok\n")
+        (ws / "review.md").write_text("Reviewed spec, code and tests. No blockers found.")
+        (ws / ".agents" / "AI_HANDOFF_LEDGER.md").write_text(
+            "REVIEW: id=R-1 author=builder-a reviewer=reviewer-b independence=same-family round=1 evidence=review.md verdict=pass\n")
+        (ws / ".agents" / MANIFEST).write_text(json.dumps({"tests": [
+            {"id": "UNIT-1", "tier": 1, "cmd": "python3 -c 'import sys; sys.exit(0)'", "deps": ["src/ui.py"], "covers": ["ORACLE-1"]},
+            {"id": "E2E-2", "tier": 3, "cmd": "python3 -c 'import sys; sys.exit(0)'", "deps": ["src/ui.py"], "covers": ["ORACLE-2"]}]}))
+        cmd_run(ws, "UNIT-1")
+        auditor = Path(__file__).resolve().parent / "skill_ambassador_auditor.py"
+        proc = subprocess.run([sys.executable, str(auditor), "--audit-workspace", str(ws), "--max-tier", "2"], capture_output=True, text=True)
+        assert proc.returncode == 3, f"expected exit 3 for tier-deferred oracle, got {proc.returncode}: {proc.stdout}"
     print(json.dumps({"status": "PASS", "checks": [
         "select: never-run, tier deferral, always-run, orphan fail-safe",
         "record + reuse on identical hashes", "change invalidates only dependent tests",
-        "failed results never reused", "deps-suggest finds symbol files"]}, indent=2))
+        "failed results never reused", "deps-suggest finds symbol files",
+        "tier-deferred oracles with --max-tier make auditor exit 3, not 1"]}, indent=2))
 
 
 def main():

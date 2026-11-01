@@ -254,11 +254,28 @@ def scan_file_for_design_and_ux(file_path: Path, rel_path: str) -> Dict[str, Lis
     return {"blockers": blockers, "warnings": warnings}
 
 
+INTERACTIVE_ELEMENT_RE = re.compile(
+    r"(?:<\s*(?:button|input|select|textarea|form)\b"
+    r"|\b(?:onClick|onSubmit|onChange|onPress|onValueChange)\s*="
+    r"|\b(?:Button|IconButton|OutlinedButton|TextButton|FloatingActionButton|TextField|OutlinedTextField|Switch|Checkbox|RadioButton|Slider|clickable)\s*\("
+    r"|android:onClick\s*=)",
+    re.I,
+)
+RTL_CONTENT_RE = re.compile(
+    r"\b(?:rtl|automirrored)\b|layoutdirection\.rtl|dir\s*=\s*['\"]rtl['\"]"
+    r"|\b(?:ar|he|fa|ur)(?:-[a-z]{2,4})?\b"
+    r"|[\u0590-\u05FF\u0600-\u06FF]",
+    re.I,
+)
+RTL_PATH_RE = re.compile(r"(?:^|[/._-])(?:values-)?(?:ar|he|fa|ur)(?:[/._-]|$)", re.I)
+
+
 def audit_mock_to_code_and_5_states(workspace_dir: Path) -> Dict[str, Any]:
     """
     Audits Pillar 2 (Mock-to-Code Visual Fidelity) & Pillar 3 (5-State UI Matrix:
     Empty, Loading, Normal, Error/Alert, Overflow/RTL/200% Font Scale).
     """
+    ignored = {"node_modules", ".git", "build", "dist", ".gradle", "__pycache__", "vendor", ".agents"}
     mocks_dir = workspace_dir / ".agents" / "mocks"
     mock_files = list(mocks_dir.glob("*.*")) if mocks_dir.exists() else []
 
@@ -270,14 +287,31 @@ def audit_mock_to_code_and_5_states(workspace_dir: Path) -> Dict[str, Any]:
         "font_scale_or_overflow": False,
     }
 
-    search_Files = list(mock_files)
-    for test_f in workspace_dir.rglob("*Test*.kt"):
-        search_Files.append(test_f)
-    for test_f in workspace_dir.rglob("*.spec.ts"):
-        search_Files.append(test_f)
+    search_files: List[Path] = list(mock_files)
+    interactive_screens: List[str] = []
+    ui_exts = {".kt", ".tsx", ".jsx", ".html", ".htm", ".css", ".xml", ".ts", ".js"}
+
+    for f in workspace_dir.rglob("*"):
+        if not f.is_file():
+            continue
+        rel_parts = f.relative_to(workspace_dir).parts
+        if any(part in ignored for part in rel_parts):
+            continue
+        rel_posix = f.relative_to(workspace_dir).as_posix()
+        if RTL_PATH_RE.search(rel_posix):
+            required_states["rtl_or_bilingual"] = True
+        if f.suffix in ui_exts:
+            search_files.append(f)
+            if f.suffix in {".kt", ".tsx", ".jsx", ".html", ".htm", ".xml"} and not any(tok in rel_posix.lower() for tok in ("test", "spec")):
+                try:
+                    txt = f.read_text(encoding="utf-8", errors="ignore")
+                    if INTERACTIVE_ELEMENT_RE.search(txt):
+                        interactive_screens.append(rel_posix)
+                except Exception:
+                    pass
 
     combined_corpus = ""
-    for f in search_Files[:60]:
+    for f in dict.fromkeys(search_files):
         try:
             combined_corpus += "\n" + f.read_text(encoding="utf-8", errors="ignore").lower()
         except Exception:
@@ -289,7 +323,7 @@ def audit_mock_to_code_and_5_states(workspace_dir: Path) -> Dict[str, Any]:
         required_states["loading"] = True
     if any(k in combined_corpus for k in ("error", "alert", "critical", "warning", "خطأ", "تحذير")):
         required_states["error_or_alert"] = True
-    if any(k in combined_corpus for k in ("rtl", "layoutdirection.rtl", "dir=\"rtl\"", "ar")):
+    if RTL_CONTENT_RE.search(combined_corpus):
         required_states["rtl_or_bilingual"] = True
     if any(k in combined_corpus for k in ("fontscale", "overflow", "ellipsize", "maxlines", "120.dp", "320dp", "360dp")):
         required_states["font_scale_or_overflow"] = True
@@ -297,6 +331,7 @@ def audit_mock_to_code_and_5_states(workspace_dir: Path) -> Dict[str, Any]:
     covered_count = sum(1 for v in required_states.values() if v)
     return {
         "mocks_found": len(mock_files),
+        "interactive_screens": sorted(interactive_screens),
         "states_coverage": required_states,
         "states_covered_count": covered_count,
         "total_required_states": len(required_states),
@@ -308,7 +343,7 @@ def scan_directory(root_dir: Path) -> Dict[str, Any]:
         raise FileNotFoundError(f"Scan directory does not exist: {root_dir}")
 
     exts = {".kt", ".tsx", ".jsx", ".css", ".svg", ".xml", ".html", ".htm"}
-    ignored = {"node_modules", ".git", "build", "dist", ".gradle", "__pycache__", "vendor"}
+    ignored = {"node_modules", ".git", "build", "dist", ".gradle", "__pycache__", "vendor", ".agents"}
 
     all_blockers: List[Dict[str, Any]] = []
     all_warnings: List[Dict[str, Any]] = []
@@ -317,7 +352,7 @@ def scan_directory(root_dir: Path) -> Dict[str, Any]:
     for path in root_dir.rglob("*"):
         if not path.is_file() or path.suffix not in exts:
             continue
-        if any(part in ignored for part in path.parts):
+        if any(part in ignored for part in path.relative_to(root_dir).parts):
             continue
         files_scanned += 1
         rel = str(path.relative_to(root_dir))
@@ -326,6 +361,18 @@ def scan_directory(root_dir: Path) -> Dict[str, Any]:
         all_warnings.extend(res["warnings"])
 
     state_matrix = audit_mock_to_code_and_5_states(root_dir)
+    missing_states = [k for k, v in state_matrix["states_coverage"].items() if not v]
+    if state_matrix.get("interactive_screens") and missing_states:
+        all_blockers.append({
+            "pillar": "Pillar 3: 5-State UI Matrix Verification",
+            "rule": "UI-5-STATES-MISSING",
+            "location": ", ".join(state_matrix["interactive_screens"]),
+            "missing_states": missing_states,
+            "remediation": (
+                f"Interactive UI screen(s) missing required state coverage for: {', '.join(missing_states)}. "
+                "Cover Empty, Loading, Error/Alert, RTL/Bilingual, and Font-Scale/Overflow states."
+            ),
+        })
 
     return {
         "design_linter_status": "PASS" if len(all_blockers) == 0 else "FAIL_DESIGN_BLOCKERS",
@@ -396,6 +443,53 @@ def run_self_test() -> None:
         assert pass_report["design_linter_status"] == "PASS"
         assert pass_report["hard_blockers_count"] == 0
         checks.append("Compliant Design Token, SVG & RTL Icon Verification: PASS")
+
+        # 4. Verify .agents directory is ignored, RTL does not match "ar" substrings ("start"/"share"),
+        # and missing required states on an interactive screen produces a blocker.
+        agents_dir = ws / ".agents"
+        agents_dir.mkdir(exist_ok=True)
+        (agents_dir / "MockScreen.tsx").write_text(
+            "export const Mock = () => <div style={{ color: '#FF0000' }}><button onClick={() => {}}>Start Share</button></div>;\n",
+            encoding="utf-8",
+        )
+        ignore_report = scan_directory(ws)
+        assert ignore_report["files_scanned"] == 3, f"Expected .agents to be ignored, scanned {ignore_report['files_scanned']}"
+        assert ignore_report["hard_blockers_count"] == 0
+        checks.append("Ignore .agents Directory in Scanner & State Matrix: PASS")
+
+    with tempfile.TemporaryDirectory() as tmp2:
+        ws2 = Path(tmp2)
+        interactive_screen = ws2 / "ActionScreen.tsx"
+        interactive_screen.write_text(
+            "export function ActionScreen() {\n"
+            "  return <button onClick={() => {}}>Start Share</button>;\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        interactive_fail = scan_directory(ws2)
+        assert interactive_fail["ui_5_state_matrix_summary"]["states_coverage"]["rtl_or_bilingual"] is False, (
+            "'start'/'share' must not trigger rtl_or_bilingual"
+        )
+        assert interactive_fail["design_linter_status"] == "FAIL_DESIGN_BLOCKERS"
+        assert any(b.get("rule") == "UI-5-STATES-MISSING" for b in interactive_fail["hard_blockers"])
+        checks.append("RTL Whole-Word Locale Match & Interactive Missing-States Blocker: PASS")
+
+        # Verify path-based locale marker (values-ar/strings.xml) and full 5-state coverage clear the blocker
+        ar_dir = ws2 / "values-ar"
+        ar_dir.mkdir(exist_ok=True)
+        (ar_dir / "strings.xml").write_text("<resources></resources>\n", encoding="utf-8")
+        interactive_screen.write_text(
+            "export function ActionScreen() {\n"
+            "  // empty state, loading spinner, error alert, maxLines ellipsis\n"
+            "  return <button onClick={() => {}}>Start Share</button>;\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        interactive_pass = scan_directory(ws2)
+        assert interactive_pass["ui_5_state_matrix_summary"]["states_coverage"]["rtl_or_bilingual"] is True
+        assert interactive_pass["design_linter_status"] == "PASS"
+        assert interactive_pass["hard_blockers_count"] == 0
+        checks.append("Interactive 5-State Full Coverage Clears Blocker: PASS")
 
     print(
         json.dumps(

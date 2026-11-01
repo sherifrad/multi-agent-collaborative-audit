@@ -17,11 +17,7 @@
   * [The 4 Fatal AI Engineering Failure Modes](#the-4-fatal-ai-engineering-failure-modes)
 * [🏛️ Model-Agnostic Fleet Architecture](#-model-agnostic-fleet-architecture)
   * [Lane Competency Contracts](#lane-competency-contracts)
-* [🔌 Dynamic Multi-Adapter Fleet Router & Zero-API Resilience](#-dynamic-multi-adapter-fleet-router--zero-api-resilience)
-  * [The 4 Execution Adapters](#1-the-4-universal-execution-adapters)
-  * [Declarative Fleet Manifest (`.agents/fleet.json`)](#2-declarative-fleet-manifest-agentsfleetjson)
-  * [Fail-Safe Cascade & Unreachable Server Resilience](#3-unreachable-server--fail-safe-cascade)
-  * [Detection, Self-Repair & Resilience Testing](#4-built-in-detection-self-repair--resilience-testing)
+* [Fleet selection, model routing and delegation](#fleet-selection-model-routing-and-delegation)
 * [🔄 The 5-Phase SDD Engineering Workflow](#-the-5-phase-sdd-workflow)
   * [Detailed Gate Breakdown](#detailed-gate-breakdown)
 * [🧪 Phase 4: Dedicated Sequential E2E & Call-Chain Verification Zone](#-phase-4-dedicated-sequential-e2e--call-chain-verification-zone)
@@ -48,7 +44,7 @@ Modern AI-assisted software engineering suffers from **four fatal failure modes*
 3. **The Bulk-Mock & Vacuous Test Illusion**: Tests pass with green `exit code 0` because tests feed pre-baked mock payloads directly into state instead of stepping through real time sequences ($T_0 \to T_1 \to T_2$). The app passes tests, but fails when a human clicks it.
 4. **Environment Fragility & Delusion**: Agents assume external CLIs or specific API keys exist, crashing or halting when running sandboxed or offline.
 
-**Multi-Agent Collaborative Audit (MACA)** resolves these failure modes deterministically. Led by **Google Antigravity** as the Principal Consultant, MACA enforces a **5-Phase Spec-Driven Workflow**, passes all code through a **7-Rung Ponytail Minimalism Ladder**, bounds adversarial reviews to **2 rounds maximum**, and routes execution through a **Dynamic, Model-Agnostic Multi-Adapter Fleet Router** with automated fail-safe cascade.
+**Multi-Agent Collaborative Audit (MACA)** resolves these failure modes deterministically. Led by **Google Antigravity** as the Principal Consultant, MACA enforces a **5-Phase Spec-Driven Workflow**, passes all code through a **7-Rung Ponytail Minimalism Ladder**, bounds adversarial reviews to **1 round by default (2 maximum when Round 1 finds a Hard Blocker)**, and routes execution through a **Dynamic, Model-Agnostic Multi-Adapter Fleet Router** with automated fail-safe cascade.
 
 ---
 
@@ -63,7 +59,7 @@ flowchart TD
         Spec["Phase 1: Zero-Presumption Spec & Call-Chain Map"]
         MockGate["Phase 1.5: UI/UX Visual Approval Gate<br/>User Approval Inviolable"]
         Plan["Phase 2: Task Partitioning & Lane Allocation"]
-        Arbiter["Supreme Arbiter & Final Commit Authority"]
+        Arbiter["Orchestrator & Final Commit Authority"]
     end
 
     Boot --> Spec --> MockGate --> Plan
@@ -89,11 +85,11 @@ flowchart TD
 
 | Lane | Competency Contract & Deliverables | Supported Providers (Fully Dynamic) | Strict Boundary |
 | :--- | :--- | :--- | :--- |
-| **Lead Orchestrator** | Master task charter, preflight verification, arbiter rulings, commit authority | Google Antigravity | Supreme Arbiter; breaks ties after Round 2 |
+| **Lead Orchestrator** | Master task charter, preflight verification, review synthesis, commit authority | Google Antigravity | Orchestrator; after Round 2, unresolved disagreements go to the user with both positions |
 | **🎨 UI/UX Mocking** | Interactive HTML/SVG prototypes (`.agents/mocks/*.html`), vector rendering, responsive layout, a11y audit | Claude Code CLI, Vision APIs, or In-IDE Subagent | **Visual Gate**: Zero logic coding until user approves mock |
 | **🧠 Core Logic** | Domain models, algorithms, state engines, mathematical invariants | OpenCode, Codex CLI, Reasoning APIs, or In-IDE Subagent | Adheres to Ponytail Rungs 1–3 before introducing abstractions |
 | **📊 Data** | Migrations, DTOs, boundary parsers, schemas, database persistence | OpenCode, Codex CLI, Schema APIs, or In-IDE Subagent | Type-safe null safety; strict external input sanitization |
-| **🛡️ QA & Referee** | Adversarial diff reviews, call-chain tracing, sequential E2E oracle runs | Gemini CLI, Deep-Context APIs, or In-IDE Subagent | **Rule 6 Tabula Rasa**: Independent critique; no assumptions |
+| **🛡️ QA & Referee** | Adversarial diff reviews, call-chain tracing, sequential E2E oracle runs | Antigravity CLI (`agy`), Codex CLI, OpenCode, or In-IDE Subagent | **Rule 6 Tabula Rasa**: Independent critique; no assumptions |
 
 ---
 
@@ -150,7 +146,7 @@ Phase 2: Task Partitioning & Queue Synchronization
 Phase 3: Tabula Rasa Adversarial Diff Audit (Rule 6)
   ├── QA Lane inspects `git diff` with clean slate (Zero prior knowledge or model bias)
   ├── Document findings in .agents/AI_HANDOFF_LEDGER.md (Banning fake `[In-Process]` badges)
-  └── Maximum 2 debate rounds; Antigravity Arbiter rules deterministically on unresolved disputes
+  └── 1 review round by default (max 2 when Round 1 finds a Hard Blocker); unresolved disagreements after Round 2 go to the user with both positions
 
 Phase 4: Dedicated Sequential E2E & 3-Layer Outcome Oracle Zone
   ├── Execute scripts/scenario_and_callchain_engine.py
@@ -162,7 +158,7 @@ Phase 4.5: Deep Diagnostics & Performance Profiling
   └── Require explicit User Consent before running heavy instrumentation
 
 Phase 5: Compliance Verification & Final Commit
-  ├── Run procedural compliance referee (scripts/skill_ambassador_auditor.py --verify)
+  ├── Run procedural compliance referee (scripts/skill_ambassador_auditor.py --verify <dir>)
   └── Produce atomic git commit with full Fleet Dispatch attribution badge
 ```
 
@@ -208,9 +204,9 @@ sequenceDiagram
 ### The 4 Verification Pillars
 
 1. **User-Selected Scenario Modes**:
-   * **Mode A (Predefined)**: Hardcoded deterministic test matrices and compliance fixtures.
-   * **Mode B (Imaginary Stress Scenarios)**: Generates high-friction edge cases (e.g., dead battery mid-transaction, double taps, rapid orientation flips).
-   * **Mode C (Custom Multi-Step)**: User or agent inputs specific step-by-step real user actions.
+   * **`--mode predefined` (Mode A)**: Hardcoded deterministic test matrices and compliance fixtures.
+   * **`--mode imaginary` (Mode B)**: Generates high-friction edge cases (e.g., dead battery mid-transaction, double taps, rapid orientation flips).
+   * **`--mode custom` (Mode C)**: User or agent inputs specific step-by-step real user actions (`--custom-steps`).
 2. **The Anti-Bulk-Mock Rule**: Banned from loading pre-baked complete final states. Tests must fast-forward through intake and sequentially apply chronological state transitions ($T_0 \to T_1 \to T_2$).
 3. **Multi-Caller Call-Chain Tracing**: Validates upstream callers ($F_{upstream}$) and downstream listeners ($F_{downstream}$) under test, strictly banning internal function mocks.
 4. **3-Layer Outcome Oracle**:
@@ -230,7 +226,7 @@ flowchart TD
     R4["Rung 4: Single Local Utility Function<br/>Self-contained, pure function in same module"]
     R5["Rung 5: Existing Direct Dependency<br/>Utilize already imported libraries"]
     R6["Rung 6: New Trusted Dependency<br/>Battle-tested, lightweight package (Requires justification)"]
-    R7["Rung 7: Custom Architecture / Subsystem<br/>New classes, design patterns, microservices (Supreme Arbiter Approval Required)"]
+    R7["Rung 7: Custom Architecture / Subsystem<br/>New classes, design patterns, microservices (Explicit Approval Required)"]
 
     R1 -->|If insufficient| R2
     R2 -->|If insufficient| R3
@@ -278,17 +274,6 @@ The referee reads structured records, not keywords (`REVIEW:`, `APPROVAL:`, `ASS
 Verdicts and exit codes: `APPROVED` 0, `BLOCKED_BY_SKILL_VIOLATIONS` 1, `INCOMPLETE_NOT_VERIFIED` 3.
 `NOT_APPLICABLE` gates are excluded from the score and shown with their reason.
 
----: | :--- | :--- | :---: |
-| **G-01** | Phase 0 Bootstrap & Scripts | `./scripts/bootstrap.sh` exit code `0` | `PASS` / `FAIL` |
-| **G-02** | Phase 1 Spec & Call-Chain Map | `.agents/SPEC_AND_AUDIT.md` mapped callers | `PASS` / `BLOCKED` |
-| **G-03** | Phase 1.5 Visual Mock Gate | `.agents/mocks/*.html` user sign-off | `PASS` / `BLOCKED` |
-| **G-04** | Phase 3 Tabula Rasa Diff Audit | Peer critique in `AI_HANDOFF_LEDGER.md` (No fake `[In-Process]`) | `PASS` / `BLOCKED` |
-| **G-05** | Phase 4.1 Scenario Mode Choice | Mode A, B, or C explicitly documented | `PASS` / `BLOCKED` |
-| **G-06** | Phase 4.2 Anti-Bulk-Mock Rule | Chronological event transitions ($T_0 \to T_1 \to T_2$) | `PASS` / `BLOCKED` |
-| **G-07** | Phase 4.3 Call-Chain & Zero Mock | Zero internal function mocks detected | `PASS` / `BLOCKED` |
-| **G-08** | Phase 4.4 3-Layer Outcome Oracle | Logic + Storage + UI + Negative Control | `PASS` / `BLOCKED` |
-| **G-09** | Task Queue Synchronization | `tasks/current_task.md` marked `- [x]` with date & proof | `PASS` / `BLOCKED` |
-
 ---
 
 ## 🚀 Quickstart & Developer Tracks
@@ -324,10 +309,10 @@ python3 scripts/fleet_run.py --brief brief.md --cd . --out-dir .agents/fleet-run
 | Script | Primary Command | Key Flags | Role |
 | :--- | :--- | :--- | :--- |
 | **`bootstrap.sh`** | `./scripts/bootstrap.sh` | `--force-first-run` | Verifies skill integrity & discovers runtime environment |
-| **`first_run_preflight.py`** | `python3 scripts/first_run_preflight.py` | `--force`, `--json` | Runs deep 29-item self-test & tool inventory diagnostic |
+| **`first_run_preflight.py`** | `python3 scripts/first_run_preflight.py` | `--force`, `--reset`, `--self-test` | Runs first-run self-test & tool inventory diagnostic |
 | **`fleet_select.py` / `model_router.py` / `fleet_run.py`** | `python3 scripts/<name>.py` | `--self-test` | Fleet plan, model and effort per role, relay runner with fallback |
-| **`scenario_and_callchain_engine.py`** | `python3 scripts/scenario_and_callchain_engine.py` | `--self-test`, `--mode <A/B/C>`, `--trace-dir <dir>` | Anti-bulk-mock sequential oracle & caller graph tracer |
-| **`skill_ambassador_auditor.py`** | `python3 scripts/skill_ambassador_auditor.py` | `--self-test`, `--init-log <dir>`, `--audit-workspace <dir>` | Enforces procedural gates G-01 through G-09 |
+| **`scenario_and_callchain_engine.py`** | `python3 scripts/scenario_and_callchain_engine.py` | `--self-test`, `--mode {predefined,imaginary,custom}`, `--trace-dir <dir> --symbol <name>` | Anti-bulk-mock sequential oracle & caller graph tracer |
+| **`skill_ambassador_auditor.py`** | `python3 scripts/skill_ambassador_auditor.py` | `--self-test`, `--init-log <dir>`, `--audit-workspace <dir>`, `--verify <dir>`, `--domains <list>`, `--src-dir <dir>`, `--max-tier <N>` | Enforces procedural gates S1 through S9 |
 
 ---
 

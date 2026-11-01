@@ -165,7 +165,7 @@ bash scripts/bootstrap.sh
 python3 scripts/impact_and_cache.py select --ws . --max-tier 2
 ```
 
-Zero-API mode works with in-IDE subagents. With installed CLIs (`claude`, `codex`, `opencode`, `gemini`, `agy`) the router dispatches lanes across different models for more independent review (`python3 scripts/fleet_select.py`).
+Zero-API mode works with in-IDE subagents. With installed CLIs (`claude`, `codex`, `opencode`, `agy`) the router dispatches lanes across different models for more independent review (`python3 scripts/fleet_select.py`).
 
 ## 🛠️ Scripts
 

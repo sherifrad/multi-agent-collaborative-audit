@@ -62,10 +62,26 @@ def pick_model(item: Dict[str, Any], want_family: Optional[str]) -> str:
     return ""
 
 
+def parse_write_permissions(raw_w: str) -> set:
+    if not raw_w or "inferred" in raw_w.lower():
+        return set()
+    ok = set()
+    for part in re.split(r"[,;/\n]+", raw_w.lower()):
+        m = re.match(r"^\s*([a-z][\w.-]*)\s*:\s*(.+?)\s*$", part)
+        if not m:
+            continue
+        name, perm = m.group(1), m.group(2)
+        if re.search(r"\b(?:read-only|readonly|none|no)\b", perm):
+            continue
+        if re.search(r"\b(?:write|rw|read-write)\b|workspace-write", perm):
+            ok.add(name)
+    return ok
+
+
 def build_plan(discover: Optional[Dict[str, Any]], lanes: Dict[str, Any], profile: str) -> Dict[str, Any]:
     approved = confirmed_names(profile, "Approved vendors")
     raw_w = profile_field(profile, "Write-lane permissions")
-    write_ok = set() if "inferred" in raw_w.lower() else {t for t in re.split(r"[^\w.-]+", raw_w.lower()) if t} - {"none", "no", "read", "only"}
+    write_ok = parse_write_permissions(raw_w)
     items = {d["key"]: d for d in (discover or {}).get("discovered", [])}
     withheld: List[Dict[str, str]] = []
     usable: Dict[str, Dict[str, Any]] = {}     # key -> {family, model, lane}
@@ -155,9 +171,13 @@ def self_test() -> None:
     checks.append("a vendor serving the orchestrator's own model family is not independent")
     write = build_plan(d(("claude", True, []), ("codex", True, [])), {"feature": {"implementer": "codex"}}, prof("codex", "codex: workspace-write"))
     assert write["roles"]["builder"]["vendor"] == "codex" and write["roles"]["builder"]["mode"] == "write"
+    write2 = build_plan(d(("claude", True, []), ("codex", True, [])), {"feature": {"implementer": "codex"}}, prof("codex", "codex: write"))
+    assert write2["roles"]["builder"]["vendor"] == "codex" and write2["roles"]["builder"]["mode"] == "write"
+    ro = build_plan(d(("claude", True, []), ("codex", True, [])), {"feature": {"implementer": "codex"}}, prof("codex", "codex: read-only"))
+    assert ro["roles"]["builder"]["vendor"] == "claude-subagent", ro
     nowrite = build_plan(d(("claude", True, []), ("codex", True, [])), {}, prof("codex", "none"))
     assert nowrite["roles"]["builder"]["vendor"] == "claude-subagent"
-    checks.append("an external builder needs a Write-lane permission naming it")
+    checks.append("an external builder needs a Write-lane permission naming it (codex: write -> write; codex: read-only -> no write)")
     ghost = build_plan(d(("claude", True, [])), {}, prof("gemini"))
     assert any(w["vendor"] == "gemini" and "not installed" in w["why"] for w in ghost["withheld"])
     checks.append("approved but missing vendor is reported")

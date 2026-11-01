@@ -86,14 +86,23 @@ def seed_catalog(discover: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
-def load_catalog(cwd: Path, discover: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+def load_catalog(cwd: Path, discover: Optional[Dict[str, Any]] = None, reseed: bool = False) -> List[Dict[str, Any]]:
     p = cwd / ".agents" / "model_catalog.json"
+    existing: List[Dict[str, Any]] = []
     if p.exists():
         try:
-            return json.loads(p.read_text())["models"]
+            existing = json.loads(p.read_text())["models"]
+            if not reseed:
+                return existing
         except (ValueError, KeyError):
             pass
-    return seed_catalog(discover)
+    seeded = seed_catalog(discover)
+    if not existing:
+        return seeded
+    confirmed = {(e.get("vendor"), e.get("id")): e for e in existing if e.get("source") == "confirmed"}
+    out = [confirmed.pop((e.get("vendor"), e.get("id")), e) for e in seeded]
+    out.extend(confirmed.values())
+    return out
 
 
 # ------------------------------------------------------------------ risk (deterministic, no model call)
@@ -321,10 +330,16 @@ def route(role: str, cwd: Path, signals: Dict[str, Any], discover: Optional[Dict
         stop = "BUDGET_EXHAUSTED: standard call limit reached"
     if "rounds" in bstate["exhausted"]:
         stop = "BUDGET_EXHAUSTED: round limit reached"
-    cands = pick(catalog, role, want, available, signals.get("builder_family", ""))
-    if role in ("builder", "test-designer") or not cands:
-        local = [e for e in pick(catalog, role, want, {}, signals.get("builder_family", "")) if e["vendor"] == "claude"]
+    bfam = signals.get("builder_family", "")
+    need_cross = role in ("reviewer", "second-reviewer") and (risk["class"] == "high" or signals.get("full_path", False)) and bool(bfam)
+    cands = pick(catalog, role, want, available, bfam)
+    if role in ("builder", "test-designer") or (not cands and not need_cross):
+        local = [e for e in pick(catalog, role, want, {}, bfam) if e["vendor"] == "claude"]
         cands = (local + [c for c in cands if c not in local]) if role in ("builder", "test-designer") else (cands or local)
+    if need_cross:
+        cands = [c for c in cands if c["family"] != bfam]
+        if not cands and not stop:
+            stop = "QUOTA_EXHAUSTED_NO_CROSS_FAMILY"
     if not cands and not stop:
         stop = f"NO_ELIGIBLE_MODEL for {role} at tier {want['tier']}: confirm a model in .agents/model_catalog.json or approve a vendor"
     decision = {"role": role, "risk": risk, "want": want, "stop": stop, "choice": cands[0] if cands else None,
@@ -455,6 +470,20 @@ def self_test() -> None:
     seq = [order(wanted("reviewer", c, 0, 0, False)) for c in ("docs", "low", "medium", "high")]
     assert seq == sorted(seq)
     checks.append("reviewer cost never goes down as criticality goes up")
+    with tempfile.TemporaryDirectory() as t:
+        tp = Path(t)
+        d_stop = route("reviewer", tp, {"full_path": True, "builder_family": "anthropic", "risk": {"class": "low", "paths": [], "reasons": []}}, {"discovered": []})
+        assert d_stop["choice"] is None and d_stop["chain"] == [] and d_stop["stop"] == "QUOTA_EXHAUSTED_NO_CROSS_FAMILY", d_stop
+        checks.append("reviewer on full-path or high-risk with builder_family drops same-family candidates and stops with QUOTA_EXHAUSTED_NO_CROSS_FAMILY")
+        (tp / ".agents").mkdir(exist_ok=True)
+        (tp / ".agents" / "model_catalog.json").write_text(json.dumps({"models": [
+            {"id": "gemini-4-argon-high", "vendor": "agy", "family": "google", "tier": "frontier", "efforts": ["high"], "free": False, "source": "confirmed"},
+            {"id": "old-inferred", "vendor": "codex", "family": "openai", "tier": "standard", "efforts": [], "free": False, "source": "inferred"}
+        ]}))
+        reseeded = load_catalog(tp, {"discovered": [{"key": "codex", "models": {"values": ["gpt-5-codex"]}}]}, reseed=True)
+        ids = {e["id"]: e["source"] for e in reseeded}
+        assert ids.get("gemini-4-argon-high") == "confirmed" and "gpt-5-codex" in ids and "old-inferred" not in ids, ids
+        checks.append("catalog --write re-seeds from discovery while preserving confirmed entries")
     print(json.dumps({"self_test_status": "PASS", "checks_executed": len(checks), "details": checks}, indent=2))
 
 
@@ -481,7 +510,7 @@ def main() -> None:
     cwd = Path(a.cwd).resolve()
     discover = json.loads(Path(a.discover_json).read_text()) if a.discover_json else fleet_select.run_node("discover.mjs")
     if a.command == "catalog":
-        cat = load_catalog(cwd, discover)
+        cat = load_catalog(cwd, discover, reseed=a.write)
         doc = {"note": "Edit tier/family/efforts, then set source to 'confirmed'. Inferred models never act as the frontier reviewer.", "models": cat}
         if a.write:
             (cwd / ".agents").mkdir(exist_ok=True)

@@ -18,7 +18,8 @@
 - **Risk paths** (globs or words that always mean high risk, comma separated, e.g. `billing/*, auth/*`):
 - **Downgrade paths** (human only; `glob=level` with level 0-2, comma separated, e.g. `evidence/**=0, **/ui/**=1`; lowers criticality for paths that over-escalate; Risk paths still win):
 - **Approvals** (who approves UI mocks, thresholds, releases):
-- **Approved vendors** (external CLIs/APIs allowed to receive code and specs: opencode, codex, gemini, agy; write `none` if none. A lane in the delegate-setup config is NOT an approval):
+- **Human approvers** (optional; people allowed to record APPROVAL lines):
+- **Approved vendors** (external CLIs/APIs allowed to receive code and specs: opencode, codex, agy; write `none` if none. A lane in the delegate-setup config is NOT an approval):
 - **Write-lane permissions** (may an external lane edit files? `none` = read-only review only; or name the vendor and mode, e.g. `codex: workspace-write`):
 - **Max tier ceiling without asking** (T1-T4):
 - **Unattended policy** (what the AI may decide alone, what must wait for a human; default: see SKILL.md section 5):

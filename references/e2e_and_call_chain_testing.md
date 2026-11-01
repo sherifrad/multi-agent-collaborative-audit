@@ -86,9 +86,9 @@ Whenever authentication, clinician registration, or admin authorization (`isSyst
 
 | Permutation ID | Username Input | Email Input | Provider & Verification | Expected Role |
 | :--- | :--- | :--- | :--- | :--- |
-| `AUTH-FUZZ-01` | `admin@example.com` | `admin@example.com` | Google (`verified=true`) | `ADMIN` |
-| `AUTH-FUZZ-02` | `admin@example.com` | `null` (Email in username) | Google (`verified=true`) | `ADMIN` |
-| `AUTH-FUZZ-03` | `  ADMIN@EXAMPLE.COM ` | ` ADMIN@EXAMPLE.COM ` | Google (`verified=true`) | `ADMIN` |
-| `AUTH-FUZZ-04` | `admin@example.com` | `admin@example.com` | Password (`verified=false`) | `NON_ADMIN_REJECTED` |
-| `AUTH-FUZZ-05` | `dr.admin+fake@gmail.com` | `dr.admin+fake@gmail.com` | Google (`verified=true`) | `NON_ADMIN_REJECTED` |
+| `AUTH-FUZZ-01` | `user@example.com` | `user@example.com` | Google (`verified=true`) | `ADMIN` |
+| `AUTH-FUZZ-02` | `user@example.com` | `null` (Email in username) | Google (`verified=true`) | `NON_ADMIN_REJECTED` |
+| `AUTH-FUZZ-03` | `  USER@EXAMPLE.COM ` | ` USER@EXAMPLE.COM ` | Google (`verified=true`) | `ADMIN` |
+| `AUTH-FUZZ-04` | `user@example.com` | `user@example.com` | Password (`verified=false`) | `NON_ADMIN_REJECTED` |
+| `AUTH-FUZZ-05` | `user+fake@example.com` | `user+fake@example.com` | Google (`verified=true`) | `NON_ADMIN_REJECTED` |
 | `AUTH-FUZZ-06` | `dr.ahmed.ali` | `ahmed@hospital.gov.eg` | Password (`verified=true`) | `DOCTOR_NON_ADMIN` |

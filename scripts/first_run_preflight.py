@@ -59,6 +59,7 @@ REQUIRED_INTERNAL_FILES = [
     "scripts/fleet_run.py",
     "scripts/fleet_review.sh",
     "scripts/fleet_select.py",
+    "scripts/project_map.py",
     "references/fleet_profiles.md",
     "packs/clinical/SPEC_AND_LEDGER_SECTIONS.md",
     "resources/templates/PROJECT_PROFILE.template.md",
@@ -74,7 +75,6 @@ REQUIRED_INTERNAL_FILES = [
     "vendor/delegate-skills/skills/codex-delegate/SKILL.md",
     "vendor/delegate-skills/skills/codex-delegate/scripts/relay.mjs",
     "vendor/delegate-skills/VENDOR.md",
-    "scripts/fleet_review.sh",
     "vendor/delegate-skills/skills/opencode-delegate/SKILL.md",
     "vendor/delegate-skills/skills/opencode-delegate/scripts/relay.mjs",
     "vendor/delegate-skills/skills/claude-delegate/SKILL.md",
@@ -127,13 +127,6 @@ EXTERNAL_TOOLS_CATALOG = [
         "remediation": "Open Antigravity IDE -> Command Palette (`Cmd+Shift+P`) -> 'Install agy command in PATH', or add `~/.antigravity/bin` to PATH."
     },
     {
-        "binary": "gemini",
-        "category": "AI Fleet CLI (QA & Audit Fallback Lane)",
-        "role": "Runs Gemini CLI for full-repo audit and review",
-        "criticality": "OPTIONAL_LANE",
-        "remediation": "Install Gemini CLI: `npm install -g @google/gemini-cli` and authenticate."
-    },
-    {
         "binary": "playwright",
         "category": "E2E Verification Engine (Web/PWA)",
         "role": "Drives headless/headed browser for Phase 4 sequential E2E tests",
@@ -177,6 +170,8 @@ def compute_skill_fingerprint() -> str:
         SCRIPT_DIR / "model_router.py",
         SCRIPT_DIR / "fleet_review.sh",
         SCRIPT_DIR / "fleet_run.py",
+        SCRIPT_DIR / "fleet_select.py",
+        SCRIPT_DIR / "project_map.py",
         SCRIPT_DIR / "impact_and_cache.py",
         SCRIPT_DIR / "harness.py",
         SKILL_ROOT / "resources/templates/PROJECT_PROFILE.template.md",
@@ -215,6 +210,7 @@ def run_internal_script_selftests() -> List[Dict[str, Any]]:
         ("harness.py", [sys.executable, str(SCRIPT_DIR / "harness.py"), "--self-test"]),
         ("fleet_run.py", [sys.executable, str(SCRIPT_DIR / "fleet_run.py"), "--self-test"]),
         ("fleet_select.py", [sys.executable, str(SCRIPT_DIR / "fleet_select.py"), "--self-test"]),
+        ("project_map.py", [sys.executable, str(SCRIPT_DIR / "project_map.py"), "--self-test"]),
     ]
     for name, cmd in py_scripts:
         tasks.append({
@@ -362,6 +358,17 @@ def main() -> None:
         return
 
     if args.self_test:
+        assert len(REQUIRED_INTERNAL_FILES) == len(set(REQUIRED_INTERNAL_FILES)), "REQUIRED_INTERNAL_FILES must not contain duplicates"
+        assert "scripts/project_map.py" in REQUIRED_INTERNAL_FILES and "scripts/fleet_select.py" in REQUIRED_INTERNAL_FILES
+        assert "gemini" not in {t["binary"] for t in EXTERNAL_TOOLS_CATALOG}, "gemini CLI must not be in EXTERNAL_TOOLS_CATALOG (reached via agy)"
+        skill_md = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        assert "--lane gemini" not in skill_md, "SKILL.md must not reference --lane gemini"
+        doc_ref = (SKILL_ROOT / "docs" / "FLEET_AND_V2_REFERENCE.md").read_text(encoding="utf-8")
+        assert "G-01" not in doc_ref and "G-09" not in doc_ref, "FLEET_AND_V2_REFERENCE.md must not contain G-01..G-09 leftovers"
+        assert "--json" not in doc_ref and "--mode <A/B/C>" not in doc_ref, "FLEET_AND_V2_REFERENCE.md must not list non-existent CLI flags"
+        assert "Supreme Arbiter" not in doc_ref, "FLEET_AND_V2_REFERENCE.md must not have Round 2 Arbiter contradictions"
+        grader_02 = (SKILL_ROOT / "evals" / "stale-cache-forces-rerun" / "graders" / "02-reruns-stale-and-always-tests.md").read_text(encoding="utf-8")
+        assert "impact_and_cache.py run" in grader_02 and "impact_and_cache.py record" not in grader_02
         report = execute_first_run_diagnostic(force=True)
         assert report["internal_health"] == "PASS", "Internal skill files and scripts must pass self-test"
         print(json.dumps({

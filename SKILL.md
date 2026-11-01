@@ -120,7 +120,7 @@ If it returns a `stop` (`BUDGET_EXHAUSTED`, `QUOTA_EXHAUSTED`), stop and report;
 line: *multi-vendor* (2+ model families), *same-family* (only Claude subagents), or *single-model*. A
 sandbox shell often cannot see CLIs installed on the user's own machine; if the profile expects a fleet and
 none is visible, do not quietly fall back. Write one identical brief file, give the user the exact
-`scripts/fleet_review.sh --brief ... --lane opencode:<model> --lane gemini --lane codex` command to run in
+`scripts/fleet_review.sh --brief ... --lane opencode:<model> --lane agy:gemini-3.8-flash-high --lane codex` command to run in
 their terminal, and carry on with the Claude subagent review meanwhile. Merge the vendor outputs when they
 arrive: a finding raised by 2+ families is strong evidence, a finding raised by one is labelled as such.
 Send code and specs only to vendors named in the profile's `Approved vendors` or in a human `APPROVAL:

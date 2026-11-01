@@ -370,8 +370,13 @@ def run_self_test() -> None:
     checks.append("Anti-Bulk-Mock Single-Step Rejection Guard: PASS")
 
     # 4. Test MACA v2 Auth Fuzz Matrix generator
-    fuzz = generate_auth_fuzz_matrix("admin@example.com")
+    fuzz = generate_auth_fuzz_matrix("user@example.com")
     assert len(fuzz["permutations"]) == 6
+    fuzz02 = next(p for p in fuzz["permutations"] if p["id"].startswith("AUTH-FUZZ-02"))
+    assert fuzz02["expected_role"] == "NON_ADMIN_REJECTED"
+    ref_doc = (Path(__file__).resolve().parent.parent / "references" / "e2e_and_call_chain_testing.md").read_text(encoding="utf-8")
+    fuzz02_line = next((l for l in ref_doc.splitlines() if "AUTH-FUZZ-02" in l), "")
+    assert "NON_ADMIN_REJECTED" in fuzz02_line and "user@example.com" in fuzz02_line and "admin@example.com" not in fuzz02_line
     checks.append("Upgrade 2 (Tabula Rasa 6-Permutation Auth Fuzz Matrix): PASS")
 
     # 5. Test Call-Chain Tracer & Forbidden Internal Mock Detection
