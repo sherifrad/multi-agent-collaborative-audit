@@ -13,7 +13,8 @@ When you ask an agent to change code, the same agent usually writes the tests, r
 3. **Tests come from the spec, not from the code**, written by a different agent than the builder.
 4. **An independent reviewer** audits the change without seeing the author's reasoning. The report says honestly whether the review was by a different model or the same one.
 5. **Only affected tests re-run.** Passed tests are reused until something they depend on changes; tests that were not run are reported as *not run*, never as passed.
-6. **A referee script checks the paperwork.** It refuses to say `APPROVED` unless the records have real evidence behind them.
+6. **Helper scripts are written once.** Before an agent writes a helper script it checks the project's saved scripts. A need that comes up twice becomes one general script (documented header, command-line arguments, no fixed paths) that every agent then reuses by name.
+7. **A referee script checks the paperwork.** It refuses to say `APPROVED` unless the records have real evidence behind them.
 
 Good for: auth, money, personal or regulated data, migrations, safety rules, release checks, second-opinion reviews. Not for: quick questions or small edits with no risk.
 
@@ -61,6 +62,16 @@ python3 scripts/model_router.py route --role reviewer         # model tier and e
 python3 scripts/impact_and_cache.py select --ws . --max-tier 2   # which tests to RUN, REUSE or DEFER
 python3 scripts/skill_ambassador_auditor.py --verify . --src-dir src --max-tier 3   # the referee
 ```
+
+Reusable scripts (saved per project in `.agents/harness/`):
+
+```bash
+python3 scripts/harness.py check --ws . --need "count lines in files"   # FOUND <name> | NEW | PROMOTE
+python3 scripts/harness.py adopt --ws . --file scripts                  # register a project's existing scripts once
+python3 scripts/harness.py run --ws . <name> -- <args>                  # run a saved script (hash verified first)
+```
+
+`check` matches on a script's name, `Purpose:` line and tags, never its body, and prints its `Usage:` line. `register` and `adopt` refuse scripts without a `Usage:`/`Purpose:` header and `argparse` arguments, or with hardcoded machine paths.
 
 The referee's answer is literal: `APPROVED` is the only pass. `BLOCKED_BY_SKILL_VIOLATIONS` means fix and re-run. `INCOMPLETE_NOT_VERIFIED` means something could not be checked and must be reported as unverified.
 

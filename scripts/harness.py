@@ -16,6 +16,7 @@ Commands:
   run      --ws W NAME [-- args...]                              verify hash, execute, count the use
   list     --ws W
   find     --ws W keyword [keyword...]
+  adopt    --ws W --file DIR [--scope S]                        register every reusable script in an existing folder
   promote  --ws W NAME                                           copy a project script to the global library
   --self-test
 
@@ -104,7 +105,7 @@ def cmd_check(ws, need, name):
     hits = match(ws, need + " " + (name or ""))
     if hits:
         _, scope, n, e = hits[0]
-        return f"FOUND {n} [{scope}] v{e['version']} used {e['uses']}x: {e['purpose']}  ->  harness.py run --ws <ws> {n} -- <args>"
+        return f"FOUND {n} [{scope}] v{e['version']} used {e['uses']}x: {e['purpose']}  |  usage: {e.get('usage') or 'see --help'}  ->  harness.py run --ws <ws> {n} -- <args>"
     needs_path = lib_dir(ws, "project") / "NEEDS.json"
     needs = load(needs_path, {})
     key = " ".join(sorted(words(need)))[:120] or (name or "unnamed")
@@ -121,6 +122,47 @@ def cmd_check(ws, need, name):
     return "NEW first time this need appears: write it inline; it will be promoted if it comes up again"
 
 
+ABS_PATH_RE = re.compile(r"""["'](/(?:Users|home|private|tmp|var)/[^"'\s]*|[A-Za-z]:\\\\[^"'\s]*)["']""")
+
+
+def header_field(src, field):
+    """Text after `Usage:` / `Purpose:` in the first lines (comment or docstring), else empty."""
+    head = "\n".join(src.read_text(encoding="utf-8", errors="replace").splitlines()[:12])
+    m = re.search(field + r":\s*(.+)", head)
+    return m.group(1).strip().strip('"\'#').strip() if m else ""
+
+
+def cmd_adopt(ws, directory, scope):
+    """Register every reusable script found in an existing folder; report the ones refused and why."""
+    done, refused = [], []
+    for f in sorted(Path(directory).resolve().iterdir()):
+        if not f.is_file() or f.suffix not in RUNNERS or f.name == "harness.py":
+            continue
+        problems = lint_script(f)
+        purpose = header_field(f, "Purpose")
+        if problems or not purpose:
+            refused.append(f"{f.name}: " + ("; ".join(problems) or "no Purpose: line"))
+            continue
+        name = re.sub(r"[^a-z0-9-]", "-", f.stem.lower())
+        done.append(cmd_register(ws, str(f), name, purpose, "", scope, None))
+    return "\n".join(["adopted:"] + ["  " + d for d in done] + ["refused (fix the header/args, then adopt again):"] + ["  " + r for r in refused])
+
+
+def lint_script(src):
+    """Reusable-script contract: self-describing, parameterised, no hardcoded machine paths. Returns problems."""
+    text = src.read_text(encoding="utf-8", errors="replace")
+    head = "\n".join(text.splitlines()[:12])
+    problems = []
+    if not (re.search(r"Usage:", head) and re.search(r"Purpose:", head)):
+        problems.append("the first lines must state `Usage:` and `Purpose:` so another agent can read them with `head`")
+    if src.suffix == ".py" and "argparse" not in text:
+        problems.append("a Python script must take its targets from argparse arguments (it must answer --help)")
+    hit = ABS_PATH_RE.search(text)
+    if hit:
+        problems.append(f"hardcoded machine path {hit.group(1)!r}: take it from an argument")
+    return problems
+
+
 def cmd_register(ws, file, name, purpose, tags, scope, self_test_cmd):
     src = Path(file).resolve()
     if not src.is_file():
@@ -129,6 +171,9 @@ def cmd_register(ws, file, name, purpose, tags, scope, self_test_cmd):
         fail("BadType", f"{src.suffix} not supported", f"Use one of {sorted(RUNNERS)}")
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", name):
         fail("BadName", name, "Use lowercase letters, digits, '-' or '_'")
+    problems = lint_script(src)
+    if problems:
+        fail("NotReusable", "; ".join(problems), "Generalise the script (docstring, argparse, no fixed paths), then register again")
     if self_test_cmd:
         proc = subprocess.run(self_test_cmd, shell=True, capture_output=True, text=True, cwd=str(src.parent))
         if proc.returncode != 0:
@@ -148,7 +193,7 @@ def cmd_register(ws, file, name, purpose, tags, scope, self_test_cmd):
     reg["scripts"][name] = {"file": dest.name, "sha256": new_hash, "version": version, "purpose": purpose,
                             "tags": [t for t in (tags or "").split(",") if t], "uses": uses,
                             "created": (prev or {}).get("created", time.strftime("%Y-%m-%d")),
-                            "self_test_cmd": self_test_cmd or ""}
+                            "self_test_cmd": self_test_cmd or "", "usage": header_field(src, "Usage")}
     save(reg_path, reg)
     return f"registered {name} v{version} [{scope}] sha256={new_hash[:12]}"
 
@@ -198,7 +243,15 @@ def self_test():
         ws = Path(tmp) / "ws"
         ws.mkdir()
         s = Path(tmp) / "clean_csv.py"
-        s.write_text("import sys\nprint('cleaned', *sys.argv[1:])\n")
+        hdr = '"""Usage: clean_csv.py FILE...\nPurpose: clean csv files."""\nimport argparse\n'
+        s.write_text(hdr + "print('cleaned')\n")
+        bad = Path(tmp) / "bad.py"
+        bad.write_text("print(open('/Users/someone/data.csv').read())\n")
+        try:
+            cmd_register(ws, str(bad), "bad", "p", "", "project", None)
+            raise AssertionError("non-reusable script must be refused")
+        except SystemExit as exc:
+            assert exc.code == 2, exc.code
         v = cmd_check(ws, "clean csv files remove blank rows", None)
         assert v.startswith("NEW"), v
         v = cmd_check(ws, "remove blank rows from csv files", None)
@@ -208,10 +261,17 @@ def self_test():
         assert v.startswith("FOUND clean-csv"), v
         assert cmd_run(ws, "clean-csv", ["a.csv"]) == 0
         assert registry(ws, "project")["scripts"]["clean-csv"]["uses"] == 1
+        old = Path(tmp) / "oldscripts"
+        old.mkdir()
+        (old / "count_lines.py").write_text('"""Usage: count_lines.py FILE...\nPurpose: count lines in files."""\nimport argparse\n')
+        (old / "legacy.py").write_text("print(1)\n")
+        out = cmd_adopt(ws, str(old), "project")
+        assert "count-lines" in out and "legacy.py" in out.split("refused")[1], out
+        assert "usage: count_lines.py FILE" in cmd_check(ws, "count lines in files", None)
         # same content re-registered keeps the version; changed content bumps it
         cmd_register(ws, str(s), "clean-csv", "p", "csv", "project", None)
         assert registry(ws, "project")["scripts"]["clean-csv"]["version"] == 1
-        s.write_text("print('changed')\n")
+        s.write_text(hdr + "print('changed')\n")
         cmd_register(ws, str(s), "clean-csv", "p", "csv", "project", None)
         assert registry(ws, "project")["scripts"]["clean-csv"]["version"] == 2
         # tamper detection
@@ -222,19 +282,19 @@ def self_test():
         except SystemExit as exc:
             assert exc.code == 2
         # promotion to global requires an untampered copy
-        (lib_dir(ws, "project") / "clean-csv.py").write_text("print('changed')\n")
+        (lib_dir(ws, "project") / "clean-csv.py").write_text(hdr + "print('changed')\n")
         assert "registered" in cmd_promote(ws, "clean-csv")
         assert "clean-csv" in registry(ws, "global")["scripts"]
     SKILL_DIR = real_skill_dir
     print(json.dumps({"status": "PASS", "checks": [
         "check: NEW then PROMOTE on the second similar need", "register + self-test gate",
         "check finds the saved script (FOUND)", "run counts uses", "re-register: same hash keeps version, changed hash bumps it",
-        "tampered script refused", "promote project -> global"]}, indent=2))
+        "tampered script refused", "adopt registers an existing folder and refuses non-general scripts", "FOUND shows the usage line", "register refuses scripts without Usage/Purpose, argparse, or with fixed machine paths", "promote project -> global"]}, indent=2))
 
 
 def main():
     ap = argparse.ArgumentParser(description="MACA harness library")
-    ap.add_argument("command", nargs="?", choices=["check", "register", "run", "list", "find", "promote"])
+    ap.add_argument("command", nargs="?", choices=["check", "register", "run", "list", "find", "promote", "adopt"])
     ap.add_argument("rest", nargs="*")
     ap.add_argument("--ws", default=".")
     ap.add_argument("--need")
@@ -255,6 +315,10 @@ def main():
             if not a.need:
                 fail("Usage", "--need required", 'check --ws W --need "what the script must do"')
             print(cmd_check(a.ws, a.need, a.name))
+        elif a.command == "adopt":
+            if not a.file:
+                fail("Usage", "--file DIR required", "adopt --ws W --file <folder of scripts> [--scope project|global]")
+            print(cmd_adopt(a.ws, a.file, a.scope))
         elif a.command == "register":
             if not (a.file and a.name and a.purpose):
                 fail("Usage", "--file, --name and --purpose required", "register --ws W --file F --name N --purpose P")

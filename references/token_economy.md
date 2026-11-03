@@ -36,7 +36,15 @@ Before writing any helper script run `python3 scripts/harness.py check --ws <ws>
 - `PROMOTE`: second time; write it once, `register` it (with a self-test command), and call it by name from now on.
 If the user says the work recurs ("every week", "for each export"), skip the wait: write and register it on
 first use. A registered script costs about nothing to reuse and cannot drift, because its hash is verified before each
-run. General-purpose scripts can be `promote`d to the global library for use in other projects.
+run. `register` refuses a script that is not reusable: it needs `Usage:` and `Purpose:` in its first lines,
+`argparse` arguments (so `--help` works and targets are never hardcoded), and no fixed machine paths. Exit 0
+means pass, non-zero means fail, with the reason on stderr. Extend an existing script with an optional flag
+rather than writing a near-copy. A project that already has a scripts folder: run `harness.py adopt --ws <ws> --file <folder>` once. It
+registers each script that has a `Purpose:` line and passes the rules, and lists the rest with the reason, so
+add the header or `argparse` to those and adopt again. `check` matches on the registered name, purpose and tags
+only, never the script body, and prints the `Usage:` line, so write a purpose that names the task in plain words.
+Include the one-line reuse rule from SKILL.md in every delegate brief.
+General-purpose scripts can be `promote`d to the global library for use in other projects.
 
 ## 4. Put the right model on each job
 Strongest model: spec, oracle design, adversarial review. Cheaper model or a plain script: running tests,
